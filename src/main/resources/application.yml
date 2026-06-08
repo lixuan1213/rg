@@ -1,0 +1,28 @@
+server:
+  port: 1985
+
+spring:
+  application:
+    name: charging-station
+  datasource:
+    url: jdbc:h2:mem:charging;DB_CLOSE_DELAY=-1;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+charging:
+  station:
+    fast-pile-count: 2
+    slow-pile-count: 3
+    parking-spots-per-pile: 4
