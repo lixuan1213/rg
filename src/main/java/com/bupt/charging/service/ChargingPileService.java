@@ -39,7 +39,7 @@ public class ChargingPileService {
         }
         pile.setWorkingState(PileWorkingState.IDLE);
         chargingPileRepository.save(pile);
-        schedulingService.dispatchWaitingCars(pile.getMode());
+        schedulingService.redispatchQueuedCars(pile.getMode());
         return ResultResponse.success("充电桩已开机");
     }
 
