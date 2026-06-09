@@ -7,6 +7,7 @@ import com.bupt.charging.entity.BillingRule;
 import com.bupt.charging.entity.ChargingPile;
 import com.bupt.charging.enums.PileWorkingState;
 import com.bupt.charging.repository.ChargingPileRepository;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,32 +19,33 @@ public class ChargingPileService {
     private final ChargingPileRepository chargingPileRepository;
     private final BillingService billingService;
     private final SchedulingService schedulingService;
+    private final ChargingRequestService chargingRequestService;
 
     public ChargingPileService(ChargingPileRepository chargingPileRepository,
                                BillingService billingService,
-                               SchedulingService schedulingService) {
+                               SchedulingService schedulingService,
+                               @Lazy ChargingRequestService chargingRequestService) {
         this.chargingPileRepository = chargingPileRepository;
         this.billingService = billingService;
         this.schedulingService = schedulingService;
+        this.chargingRequestService = chargingRequestService;
     }
 
     @Transactional
     public ResultResponse powerOn(String pileId) {
         ChargingPile pile = getPile(pileId);
         if (pile.getWorkingState() == PileWorkingState.FAULT) {
-            return ResultResponse.fail();
+            return ResultResponse.fail("故障桩请先恢复后再开机");
         }
         pile.setWorkingState(PileWorkingState.IDLE);
         chargingPileRepository.save(pile);
-        return ResultResponse.success();
+        schedulingService.dispatchWaitingCars(pile.getMode());
+        return ResultResponse.success("充电桩已开机");
     }
 
     @Transactional
     public ResultResponse powerOff(String pileId) {
-        ChargingPile pile = getPile(pileId);
-        pile.setWorkingState(PileWorkingState.OFF);
-        chargingPileRepository.save(pile);
-        return ResultResponse.success();
+        return chargingRequestService.handlePilePowerOff(pileId);
     }
 
     @Transactional

@@ -106,14 +106,17 @@ public class SchedulingService {
      * 仅剩排队车辆、无人充电或等待拔枪时，桩应回到 IDLE，允许下一位插入充电头。
      */
     public void updatePileWorkingState(ChargingPile pile) {
+        if (pile.getWorkingState() == PileWorkingState.OFF
+                || pile.getWorkingState() == PileWorkingState.FAULT) {
+            return;
+        }
         if (chargingRequestRepository.countByPileIdAndCarStateAndActiveTrue(
                 pile.getPileId(), CarState.PENDING_UNPLUG) > 0) {
             pile.setWorkingState(PileWorkingState.WAITING_UNPLUG);
         } else if (chargingRequestRepository.countByPileIdAndCarStateAndActiveTrue(
                 pile.getPileId(), CarState.CHARGING) > 0) {
             pile.setWorkingState(PileWorkingState.CHARGING);
-        } else if (pile.getWorkingState() != PileWorkingState.OFF
-                && pile.getWorkingState() != PileWorkingState.FAULT) {
+        } else {
             pile.setWorkingState(PileWorkingState.IDLE);
         }
     }

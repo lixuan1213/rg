@@ -282,6 +282,47 @@ public class ChargingRequestService {
         );
     }
 
+    /**
+     * 管理员关机：停止供电并关闭桩，但已插入充电头的车辆保持 {@code PENDING_UNPLUG} 状态，
+     * 等待用户手动拔枪；仅未插枪的排队车辆退回等候区。
+     */
+    @Transactional
+    public ResultResponse handlePilePowerOff(String pileId) {
+        ChargingPile pile = chargingPileService.getPile(pileId);
+        if (pile.getWorkingState() == PileWorkingState.FAULT) {
+            return ResultResponse.fail("故障桩请先恢复后再关机");
+        }
+
+        List<ChargingRequest> onPile = chargingRequestRepository.findByPileIdAndActiveTrueAndCarStateIn(
+                pileId, Set.of(CarState.CHARGING, CarState.PENDING_UNPLUG, CarState.QUEUED));
+
+        for (ChargingRequest request : onPile) {
+            if (request.getCarState() == CarState.CHARGING) {
+                LocalDateTime endTime = LocalDateTime.now();
+                double chargedAmount = calculateChargedAmount(request, pile, endTime);
+                if (chargedAmount <= 0) {
+                    chargedAmount = pile.getChargingPower() / 60.0;
+                }
+                enterPendingUnplug(request, pile, endTime, chargedAmount);
+            } else if (request.getCarState() == CarState.QUEUED) {
+                request.setCarState(CarState.WAITING);
+                request.setPileId(null);
+                request.setQueueNum(null);
+                request.setCarPosition(0);
+                chargingRequestRepository.save(request);
+            }
+        }
+
+        pile = chargingPileService.getPile(pileId);
+        pile.setWorkingState(PileWorkingState.OFF);
+        chargingPileService.savePile(pile);
+
+        schedulingService.syncPileOccupiedSpots(pile.getMode());
+        schedulingService.dispatchWaitingCars(pile.getMode());
+        refreshQueueNumbers(pile.getMode());
+        return ResultResponse.success("充电桩已关机，已插充电头的车辆请拔枪后离开，未插枪车辆已重新调度");
+    }
+
     public List<BillResponse> requestBill(String carId, LocalDate date) {
         return billingService.getBills(carId, date).stream()
                 .map(this::toBillResponse)
@@ -392,6 +433,12 @@ public class ChargingRequestService {
     /** 构建用户提示信息，主要在等待拔枪场景使用 */
     private String buildReminderMessage(ChargingRequest request) {
         if (request.getCarState() == CarState.PENDING_UNPLUG) {
+            if (request.getPileId() != null) {
+                ChargingPile pile = chargingPileService.getPile(request.getPileId());
+                if (pile.getWorkingState() == PileWorkingState.OFF) {
+                    return "充电桩已关机，充电已完成，请拔掉充电头";
+                }
+            }
             return UNPLUG_REMINDER;
         }
         if (request.getCarState() == CarState.QUEUED
