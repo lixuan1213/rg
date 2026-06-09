@@ -22,10 +22,29 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 
+/**
+ * 充电请求核心业务服务。
+ * <p>
+ * 充电流程（半自动 + 手动插拔枪）：
+ * <pre>
+ * 提交申请 → WAITING（等候区）
+ *     ↓ 调度分配
+ * QUEUED（桩侧排队，等待插枪）
+ *     ↓ 用户调用 start（插入充电头）
+ * CHARGING（充电中）
+ *     ↓ 电量达标（自动）或用户提前拔枪
+ * PENDING_UNPLUG（充电结束，等待拔枪）/ 直接 COMPLETED（提前结束）
+ *     ↓ 用户调用 end（拔掉充电头）
+ * COMPLETED（释放车位，下一位可插枪）
+ * </pre>
+ */
 @Service
 public class ChargingRequestService {
 
+    /** 充满后提示用户拔枪的文案 */
     private static final String UNPLUG_REMINDER = "充电已完成，请拔掉充电头";
+
+    /** 占用充电枪、阻止下一位插枪的车辆状态 */
     private static final Set<CarState> PILE_BLOCKING_STATES = Set.of(CarState.CHARGING, CarState.PENDING_UNPLUG);
 
     private final ChargingRequestRepository chargingRequestRepository;
@@ -46,6 +65,7 @@ public class ChargingRequestService {
         this.billingService = billingService;
     }
 
+    /** 提交充电申请，进入等候区并触发调度 */
     @Transactional
     public ChargingRequestResponse submitChargingRequest(ChargingRequestDto dto) {
         CarAccount account = accountService.getAccount(dto.getCarId());
@@ -115,6 +135,7 @@ public class ChargingRequestService {
         });
     }
 
+    /** 查询排队/调度状态，含前面车辆数与拔枪等待提示 */
     public CarStateResponse queryCarState(String carId) {
         ChargingRequest request = getActiveRequest(carId);
         if (request.getPileId() != null) {
@@ -131,6 +152,10 @@ public class ChargingRequestService {
         );
     }
 
+    /**
+     * 用户插入充电头（开始充电）。
+     * 仅 QUEUED 且 queueNum=1、桩上无其他车辆占用充电枪时允许。
+     */
     @Transactional
     public ResultResponse startCharging(StartChargingRequest request) {
         ChargingRequest chargingRequest = getActiveRequest(request.getCarId());
@@ -175,6 +200,7 @@ public class ChargingRequestService {
         return ResultResponse.success("充电头已插入，开始充电");
     }
 
+    /** 查询充电进度；若正在充电会先检查是否已充满并自动转入等待拔枪状态 */
     @Transactional
     public ChargingStateResponse queryChargingState(String carId) {
         ChargingRequest request = getActiveRequest(carId);
@@ -185,6 +211,7 @@ public class ChargingRequestService {
         return buildChargingStateResponse(request);
     }
 
+    /** 后台定时任务调用：检查所有充电中车辆是否已满 */
     @Transactional
     public void refreshChargingProgress() {
         List<ChargingRequest> chargingList =
@@ -194,6 +221,13 @@ public class ChargingRequestService {
         }
     }
 
+    /**
+     * 用户拔掉充电头（结束充电）。
+     * <ul>
+     *   <li>PENDING_UNPLUG：拔枪释放车位，返回已有账单</li>
+     *   <li>CHARGING：提前结束，结算账单并释放车位</li>
+     * </ul>
+     */
     @Transactional
     public EndChargingResponse endCharging(EndChargingRequest request) {
         ChargingRequest chargingRequest;
@@ -269,6 +303,7 @@ public class ChargingRequestService {
         );
     }
 
+    /** 查询指定模式下所有进行中的排队/充电车辆，查询前会尝试调度等候区车辆 */
     public List<QueueStateResponse> queryQueueState(ChargingMode mode) {
         schedulingService.dispatchWaitingCars(mode);
         refreshQueueNumbers(mode);
@@ -304,6 +339,7 @@ public class ChargingRequestService {
                 .orElseThrow(() -> new IllegalArgumentException("未找到进行中的充电请求: " + carId));
     }
 
+    /** 维护全局等候区车辆的 carPosition（前面还有几辆） */
     private void refreshQueueNumbers(ChargingMode mode) {
         List<ChargingRequest> waiting = chargingRequestRepository
                 .findByRequestModeAndCarStateAndActiveTrueOrderByRequestTimeAsc(mode, CarState.WAITING);
@@ -313,6 +349,7 @@ public class ChargingRequestService {
         }
     }
 
+    /** 计算当前车辆前面还有多少辆（含等候区位置与桩侧排队） */
     private long calculateCarsBefore(ChargingRequest request) {
         if (request.getCarState() == CarState.WAITING) {
             return request.getCarPosition() != null && request.getCarPosition() > 1
@@ -334,11 +371,13 @@ public class ChargingRequestService {
                 || request.getCarState() == CarState.PENDING_UNPLUG;
     }
 
+    /** 桩上是否仍有车辆占用充电枪（充电中或等待拔枪） */
     private boolean isPilePhysicallyBlocked(String pileId) {
         return chargingRequestRepository.countByPileIdAndActiveTrueAndCarStateIn(
                 pileId, PILE_BLOCKING_STATES) > 0;
     }
 
+    /** 构建用户提示信息，主要在等待拔枪场景使用 */
     private String buildReminderMessage(ChargingRequest request) {
         if (request.getCarState() == CarState.PENDING_UNPLUG) {
             return UNPLUG_REMINDER;
@@ -384,6 +423,7 @@ public class ChargingRequestService {
         );
     }
 
+    /** 校验申请电量不超过车辆最大容量 */
     private void validateRequestAmount(CarAccount account, Double requestAmount) {
         if (requestAmount > account.getCarCapacity()) {
             throw new IllegalArgumentException(
@@ -399,6 +439,7 @@ public class ChargingRequestService {
         return Math.max(0L, ChronoUnit.SECONDS.between(request.getStartTime(), asOf));
     }
 
+    /** 按功率 × 秒数 / 3600 实时计算已充电量，上限为申请电量 */
     private double calculateChargedAmount(ChargingRequest request, ChargingPile pile, LocalDateTime asOf) {
         long seconds = calculateElapsedSeconds(request, asOf);
         if (seconds <= 0) {
@@ -417,6 +458,9 @@ public class ChargingRequestService {
         return Math.round(value * 100.0) / 100.0;
     }
 
+    /**
+     * 检查是否已达申请电量；若已满则停止供电并进入等待拔枪状态（不释放车位）。
+     */
     private boolean tryAutoCompleteIfFull(ChargingRequest request) {
         if (request.getCarState() != CarState.CHARGING
                 || request.getPileId() == null
@@ -442,6 +486,10 @@ public class ChargingRequestService {
         return true;
     }
 
+    /**
+     * 充电量达标后的处理：生成账单、转入 PENDING_UNPLUG，桩进入 WAITING_UNPLUG。
+     * 此时充电头仍插着，下一位用户还不能插入。
+     */
     private Bill enterPendingUnplug(ChargingRequest chargingRequest, ChargingPile pile,
                                     LocalDateTime endTime, double chargedAmount) {
         long minutes = calculateDurationMinutes(chargingRequest, endTime);
@@ -461,6 +509,7 @@ public class ChargingRequestService {
         return bill;
     }
 
+    /** 用户提前拔枪：结算账单并立即释放车位 */
     private Bill finalizeAndRelease(ChargingRequest chargingRequest, ChargingPile pile,
                                     LocalDateTime endTime, double chargedAmount) {
         long minutes = calculateDurationMinutes(chargingRequest, endTime);
@@ -481,6 +530,9 @@ public class ChargingRequestService {
         return releaseAfterUnplug(chargingRequest, pile, bill);
     }
 
+    /**
+     * 拔枪后的收尾：归档请求、同步桩状态、刷新排队序号并触发再调度。
+     */
     private Bill releaseAfterUnplug(ChargingRequest chargingRequest, ChargingPile pile, Bill bill) {
         chargingRequest.setCarState(CarState.COMPLETED);
         chargingRequest.setActive(false);

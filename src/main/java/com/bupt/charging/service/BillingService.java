@@ -15,6 +15,11 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
+/**
+ * 计费服务：按结束时刻所在时段的电价规则计算充电费与服务费。
+ * <p>
+ * 总费用 = 充电费 + 服务费，其中服务费 = 充电费 × 服务费率。
+ */
 @Service
 public class BillingService {
 
@@ -26,6 +31,7 @@ public class BillingService {
         this.billingRuleRepository = billingRuleRepository;
     }
 
+    /** 根据充电会话生成账单，充电时长不足 1 分钟按 1 分钟计 */
     public Bill createBill(ChargingRequest request, ChargingPile pile) {
         LocalDateTime start = request.getStartTime();
         LocalDateTime end = request.getEndTime() != null ? request.getEndTime() : LocalDateTime.now();
@@ -72,6 +78,7 @@ public class BillingService {
         billingRuleRepository.saveAll(rules);
     }
 
+    /** 按结束时刻匹配峰/平/谷时段电价规则 */
     public BillingRule findRuleForTime(LocalDateTime time) {
         int hour = time.getHour();
         return billingRuleRepository.findAll().stream()

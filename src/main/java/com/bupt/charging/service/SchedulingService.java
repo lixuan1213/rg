@@ -18,6 +18,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+/**
+ * 充电调度服务：负责将等候区车辆分配到充电桩，并维护桩侧车位与排队序号。
+ * <p>
+ * 快充/慢充分开调度；支持时间顺序与优先级两种策略。
+ */
 @Service
 public class SchedulingService {
 
@@ -33,6 +38,10 @@ public class SchedulingService {
         this.systemConfigRepository = systemConfigRepository;
     }
 
+    /**
+     * 将等候区车辆依次分配到有空位的同模式充电桩。
+     * 分配后车辆进入 QUEUED 状态，等待用户手动插入充电头。
+     */
     @Transactional
     public void dispatchWaitingCars(ChargingMode mode) {
         syncPileOccupiedSpots(mode);
@@ -47,6 +56,9 @@ public class SchedulingService {
         refreshAllPileQueueNumbers(mode);
     }
 
+    /**
+     * 根据数据库实际占用情况校正充电桩车位数与工作状态，防止计数漂移。
+     */
     @Transactional
     public void syncPileOccupiedSpots(ChargingMode mode) {
         Set<CarState> occupyingStates = Set.of(
@@ -60,6 +72,7 @@ public class SchedulingService {
         }
     }
 
+    /** 将同一充电桩上 QUEUED 车辆的 queueNum 重排为 1、2、3… */
     public void refreshPileQueueNumbers(String pileId) {
         List<ChargingRequest> queued = chargingRequestRepository
                 .findByPileIdAndCarStateAndActiveTrueOrderByQueueNumAsc(pileId, CarState.QUEUED);
@@ -74,6 +87,10 @@ public class SchedulingService {
                 .forEach(pile -> refreshPileQueueNumbers(pile.getPileId()));
     }
 
+    /**
+     * 根据桩上车辆状态推导充电桩工作状态。
+     * 仅剩排队车辆、无人充电或等待拔枪时，桩应回到 IDLE，允许下一位插入充电头。
+     */
     public void updatePileWorkingState(ChargingPile pile) {
         if (chargingRequestRepository.countByPileIdAndCarStateAndActiveTrue(
                 pile.getPileId(), CarState.PENDING_UNPLUG) > 0) {
@@ -87,6 +104,7 @@ public class SchedulingService {
         }
     }
 
+    /** 充电桩故障：中断中的车辆退回等候区并触发再调度 */
     @Transactional
     public void handlePileFault(String pileId) {
         ChargingPile pile = chargingPileRepository.findById(pileId)
@@ -109,6 +127,7 @@ public class SchedulingService {
         redistributeFaultRecovery(affectedCars, pile.getMode());
     }
 
+    /** 故障恢复后重新参与调度 */
     @Transactional
     public void recoverPileFault(String pileId) {
         ChargingPile pile = chargingPileRepository.findById(pileId)
@@ -121,6 +140,9 @@ public class SchedulingService {
         dispatchWaitingCars(pile.getMode());
     }
 
+    /**
+     * 选取有空余等候车位的充电桩，优先选择当前排队最少的桩。
+     */
     public Optional<ChargingPile> findAvailablePile(ChargingMode mode) {
         return chargingPileRepository.findByMode(mode).stream()
                 .filter(pile -> pile.getWorkingState() == PileWorkingState.IDLE
@@ -130,6 +152,7 @@ public class SchedulingService {
                 .min(Comparator.comparingInt(ChargingPile::getOccupiedSpots));
     }
 
+    /** 按当前调度策略获取有序的等候区车辆列表 */
     private List<ChargingRequest> getOrderedWaitingCars(ChargingMode mode) {
         if (getSchedulingStrategy() == SchedulingStrategy.PRIORITY) {
             return chargingRequestRepository
@@ -140,6 +163,7 @@ public class SchedulingService {
                 .findByRequestModeAndCarStateAndActiveTrueOrderByRequestTimeAsc(mode, CarState.WAITING);
     }
 
+    /** 将车辆分配到指定充电桩的排队队列 */
     private void assignCarToPile(ChargingRequest request, ChargingPile pile) {
         request.setCarState(CarState.QUEUED);
         request.setPileId(pile.getPileId());
@@ -152,6 +176,7 @@ public class SchedulingService {
         chargingPileRepository.save(pile);
     }
 
+    /** 故障恢复时，按策略将中断车辆重新放回等候区并逐辆再调度 */
     private void redistributeFaultRecovery(List<ChargingRequest> interruptedCars, ChargingMode mode) {
         SchedulingStrategy strategy = getSchedulingStrategy();
         List<ChargingRequest> ordered = interruptedCars.stream()
