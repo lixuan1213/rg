@@ -76,6 +76,8 @@ public class ChargingRequestService {
                 .ifPresent(req -> {
                     throw new IllegalStateException("车辆已有进行中的充电请求");
                 });
+
+        /* 检查充电请求是否超过上限 */
         validateRequestAmount(account, dto.getRequestAmount());
 
         ChargingRequest request = new ChargingRequest();
@@ -309,10 +311,7 @@ public class ChargingRequestService {
         refreshQueueNumbers(mode);
         List<ChargingRequest> requests = chargingRequestRepository.findByRequestModeAndActiveTrueAndCarStateIn(
                 mode, List.of(CarState.WAITING, CarState.QUEUED, CarState.CHARGING, CarState.PENDING_UNPLUG));
-        Comparator<ChargingRequest> order = schedulingService.getSchedulingStrategy() == SchedulingStrategy.PRIORITY
-                ? Comparator.comparing(ChargingRequest::getPriority).reversed()
-                        .thenComparing(ChargingRequest::getRequestTime)
-                : Comparator.comparing(ChargingRequest::getRequestTime);
+        Comparator<ChargingRequest> order = buildQueueDisplayComparator(schedulingService.getSchedulingStrategy());
         LocalDateTime now = LocalDateTime.now();
         return requests.stream()
                 .sorted(order)
@@ -323,6 +322,19 @@ public class ChargingRequestService {
                         ChronoUnit.MINUTES.between(req.getRequestTime(), now)
                 ))
                 .toList();
+    }
+
+    /** 队列展示排序，与调度策略保持一致 */
+    private Comparator<ChargingRequest> buildQueueDisplayComparator(SchedulingStrategy strategy) {
+        if (strategy == SchedulingStrategy.PRIORITY) {
+            return Comparator.comparing(ChargingRequest::getPriority).reversed()
+                    .thenComparing(ChargingRequest::getRequestTime);
+        }
+        if (strategy == SchedulingStrategy.SHORTEST_TIME) {
+            return Comparator.comparing(ChargingRequest::getRequestAmount)
+                    .thenComparing(ChargingRequest::getRequestTime);
+        }
+        return Comparator.comparing(ChargingRequest::getRequestTime);
     }
 
     private ResultResponse updateActiveRequest(String carId, Function<ChargingRequest, Boolean> updater) {
