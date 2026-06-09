@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class SchedulingService {
@@ -34,6 +35,7 @@ public class SchedulingService {
 
     @Transactional
     public void dispatchWaitingCars(ChargingMode mode) {
+        syncPileOccupiedSpots(mode);
         List<ChargingRequest> waitingCars = getOrderedWaitingCars(mode);
         for (ChargingRequest request : waitingCars) {
             Optional<ChargingPile> pileOpt = findAvailablePile(mode);
@@ -41,6 +43,47 @@ public class SchedulingService {
                 break;
             }
             assignCarToPile(request, pileOpt.get());
+        }
+        refreshAllPileQueueNumbers(mode);
+    }
+
+    @Transactional
+    public void syncPileOccupiedSpots(ChargingMode mode) {
+        Set<CarState> occupyingStates = Set.of(
+                CarState.QUEUED, CarState.CHARGING, CarState.PENDING_UNPLUG);
+        for (ChargingPile pile : chargingPileRepository.findByMode(mode)) {
+            int actual = (int) chargingRequestRepository.countByPileIdAndActiveTrueAndCarStateIn(
+                    pile.getPileId(), occupyingStates);
+            pile.setOccupiedSpots(actual);
+            updatePileWorkingState(pile);
+            chargingPileRepository.save(pile);
+        }
+    }
+
+    public void refreshPileQueueNumbers(String pileId) {
+        List<ChargingRequest> queued = chargingRequestRepository
+                .findByPileIdAndCarStateAndActiveTrueOrderByQueueNumAsc(pileId, CarState.QUEUED);
+        for (int i = 0; i < queued.size(); i++) {
+            queued.get(i).setQueueNum(i + 1);
+            chargingRequestRepository.save(queued.get(i));
+        }
+    }
+
+    public void refreshAllPileQueueNumbers(ChargingMode mode) {
+        chargingPileRepository.findByMode(mode)
+                .forEach(pile -> refreshPileQueueNumbers(pile.getPileId()));
+    }
+
+    public void updatePileWorkingState(ChargingPile pile) {
+        if (chargingRequestRepository.countByPileIdAndCarStateAndActiveTrue(
+                pile.getPileId(), CarState.PENDING_UNPLUG) > 0) {
+            pile.setWorkingState(PileWorkingState.WAITING_UNPLUG);
+        } else if (chargingRequestRepository.countByPileIdAndCarStateAndActiveTrue(
+                pile.getPileId(), CarState.CHARGING) > 0) {
+            pile.setWorkingState(PileWorkingState.CHARGING);
+        } else if (pile.getWorkingState() != PileWorkingState.OFF
+                && pile.getWorkingState() != PileWorkingState.FAULT) {
+            pile.setWorkingState(PileWorkingState.IDLE);
         }
     }
 
@@ -50,17 +93,20 @@ public class SchedulingService {
                 .orElseThrow(() -> new IllegalArgumentException("充电桩不存在: " + pileId));
         pile.setWorkingState(PileWorkingState.FAULT);
 
-        List<ChargingRequest> chargingCars = chargingRequestRepository
-                .findByPileIdAndCarStateAndActiveTrue(pileId, CarState.CHARGING);
-        for (ChargingRequest request : chargingCars) {
+        List<ChargingRequest> affectedCars = chargingRequestRepository
+                .findByPileIdAndActiveTrueAndCarStateIn(pileId,
+                        Set.of(CarState.CHARGING, CarState.PENDING_UNPLUG));
+        for (ChargingRequest request : affectedCars) {
             request.setCarState(CarState.QUEUED);
             request.setPileId(null);
+            request.setQueueNum(null);
+            request.setBillId(null);
             pile.setOccupiedSpots(Math.max(0, pile.getOccupiedSpots() - 1));
         }
         chargingPileRepository.save(pile);
 
         dispatchWaitingCars(pile.getMode());
-        redistributeFaultRecovery(chargingCars, pile.getMode());
+        redistributeFaultRecovery(affectedCars, pile.getMode());
     }
 
     @Transactional
@@ -78,7 +124,8 @@ public class SchedulingService {
     public Optional<ChargingPile> findAvailablePile(ChargingMode mode) {
         return chargingPileRepository.findByMode(mode).stream()
                 .filter(pile -> pile.getWorkingState() == PileWorkingState.IDLE
-                        || pile.getWorkingState() == PileWorkingState.CHARGING)
+                        || pile.getWorkingState() == PileWorkingState.CHARGING
+                        || pile.getWorkingState() == PileWorkingState.WAITING_UNPLUG)
                 .filter(pile -> pile.getOccupiedSpots() < pile.getParkingSpots())
                 .min(Comparator.comparingInt(ChargingPile::getOccupiedSpots));
     }
@@ -96,6 +143,7 @@ public class SchedulingService {
     private void assignCarToPile(ChargingRequest request, ChargingPile pile) {
         request.setCarState(CarState.QUEUED);
         request.setPileId(pile.getPileId());
+        request.setCarPosition(0);
         int queueNum = chargingRequestRepository
                 .findByPileIdAndCarStateAndActiveTrue(pile.getPileId(), CarState.QUEUED).size() + 1;
         request.setQueueNum(queueNum);

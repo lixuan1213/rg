@@ -55,6 +55,9 @@ public class ChargingRequest {
     @Column(name = "end_time")
     private LocalDateTime endTime;
 
+    @Column(name = "bill_id")
+    private Long billId;
+
     @Column(nullable = false)
     private boolean active = true;
 
@@ -86,6 +89,8 @@ public class ChargingRequest {
     public void setStartTime(LocalDateTime startTime) { this.startTime = startTime; }
     public LocalDateTime getEndTime() { return endTime; }
     public void setEndTime(LocalDateTime endTime) { this.endTime = endTime; }
+    public Long getBillId() { return billId; }
+    public void setBillId(Long billId) { this.billId = billId; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
 }

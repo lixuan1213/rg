@@ -1,5 +1,6 @@
 package com.bupt.charging.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotBlank;
 
 public class StartChargingRequest {
@@ -7,7 +8,8 @@ public class StartChargingRequest {
     @NotBlank
     private String carId;
 
-    @NotBlank
+    /** 可选；若填写必须与系统分配的充电桩一致 */
+    @JsonAlias("chargingPileNum")
     private String chargePileNum;
 
     public String getCarId() { return carId; }

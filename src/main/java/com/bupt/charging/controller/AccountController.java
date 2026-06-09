@@ -21,12 +21,12 @@ public class AccountController {
     @PostMapping("/create")
     public ApiResponse<ResultResponse> createNewAccount(@Valid @RequestBody CreateAccountRequest request) {
         boolean success = accountService.createNewAccount(request);
-        return ApiResponse.success(success ? ResultResponse.success() : ResultResponse.fail());
+        return ApiResponse.ofResult(success ? ResultResponse.success() : ResultResponse.fail("账号已存在"));
     }
 
     @PostMapping("/set-pwd")
     public ApiResponse<ResultResponse> setPassword(@Valid @RequestBody SetPasswordRequest request) {
         boolean success = accountService.setPassword(request);
-        return ApiResponse.success(success ? ResultResponse.success() : ResultResponse.fail());
+        return ApiResponse.ofResult(success ? ResultResponse.success() : ResultResponse.fail("车辆账号不存在"));
     }
 }

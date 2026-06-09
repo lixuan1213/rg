@@ -1,5 +1,8 @@
 package com.bupt.charging.dto;
 
+import com.bupt.charging.dto.response.EndChargingResponse;
+import com.bupt.charging.dto.response.ResultResponse;
+
 public class ApiResponse<T> {
 
     private int code;
@@ -20,6 +23,20 @@ public class ApiResponse<T> {
 
     public static <T> ApiResponse<T> fail(String message) {
         return new ApiResponse<>(1, message, null);
+    }
+
+    public static ApiResponse<ResultResponse> ofResult(ResultResponse result) {
+        if (result.getResult() == 0) {
+            return new ApiResponse<>(0, "success", result);
+        }
+        return new ApiResponse<>(1, result.getMessage(), result);
+    }
+
+    public static ApiResponse<EndChargingResponse> ofEndCharging(EndChargingResponse response) {
+        if (response.getResult() == 0) {
+            return new ApiResponse<>(0, "success", response);
+        }
+        return new ApiResponse<>(1, response.getMessage(), response);
     }
 
     public int getCode() { return code; }

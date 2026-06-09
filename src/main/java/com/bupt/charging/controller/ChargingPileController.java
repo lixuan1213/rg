@@ -21,27 +21,27 @@ public class ChargingPileController {
     }
 
     @PostMapping("/{pileId}/power-on")
-    public ApiResponse<ResultResponse> powerOn(@PathVariable String pileId) {
-        return ApiResponse.success(chargingPileService.powerOn(pileId));
+    public ApiResponse<ResultResponse> powerOn(@PathVariable("pileId") String pileId) {
+        return ApiResponse.ofResult(chargingPileService.powerOn(pileId));
     }
 
     @PostMapping("/{pileId}/power-off")
-    public ApiResponse<ResultResponse> powerOff(@PathVariable String pileId) {
-        return ApiResponse.success(chargingPileService.powerOff(pileId));
+    public ApiResponse<ResultResponse> powerOff(@PathVariable("pileId") String pileId) {
+        return ApiResponse.ofResult(chargingPileService.powerOff(pileId));
     }
 
     @PostMapping("/{pileId}/start")
-    public ApiResponse<ResultResponse> startChargingPile(@PathVariable String pileId) {
-        return ApiResponse.success(chargingPileService.startChargingPile(pileId));
+    public ApiResponse<ResultResponse> startChargingPile(@PathVariable("pileId") String pileId) {
+        return ApiResponse.ofResult(chargingPileService.startChargingPile(pileId));
     }
 
     @PutMapping("/parameters")
     public ApiResponse<ResultResponse> setParameters(@Valid @RequestBody SetParametersRequest request) {
-        return ApiResponse.success(chargingPileService.setParameters(request));
+        return ApiResponse.ofResult(chargingPileService.setParameters(request));
     }
 
     @GetMapping("/{pileId}/state")
-    public ApiResponse<PileStateResponse> queryPileState(@PathVariable String pileId) {
+    public ApiResponse<PileStateResponse> queryPileState(@PathVariable("pileId") String pileId) {
         return ApiResponse.success(chargingPileService.queryPileState(pileId));
     }
 
@@ -51,12 +51,12 @@ public class ChargingPileController {
     }
 
     @PostMapping("/{pileId}/fault")
-    public ApiResponse<ResultResponse> reportFault(@PathVariable String pileId) {
-        return ApiResponse.success(chargingPileService.reportFault(pileId));
+    public ApiResponse<ResultResponse> reportFault(@PathVariable("pileId") String pileId) {
+        return ApiResponse.ofResult(chargingPileService.reportFault(pileId));
     }
 
     @PostMapping("/{pileId}/recover")
-    public ApiResponse<ResultResponse> recoverFault(@PathVariable String pileId) {
-        return ApiResponse.success(chargingPileService.recoverFault(pileId));
+    public ApiResponse<ResultResponse> recoverFault(@PathVariable("pileId") String pileId) {
+        return ApiResponse.ofResult(chargingPileService.recoverFault(pileId));
     }
 }

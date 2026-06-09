@@ -5,6 +5,7 @@ import com.bupt.charging.enums.CarState;
 import com.bupt.charging.enums.ChargingMode;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +21,18 @@ public interface ChargingRequestRepository extends JpaRepository<ChargingRequest
 
     List<ChargingRequest> findByPileIdAndCarStateAndActiveTrue(String pileId, CarState carState);
 
-    long countByRequestModeAndCarStateAndActiveTrueAndQueueNumLessThan(
-            ChargingMode mode, CarState carState, Integer queueNum);
+    List<ChargingRequest> findByPileIdAndCarStateAndActiveTrueOrderByQueueNumAsc(
+            String pileId, CarState carState);
+
+    long countByPileIdAndCarStateAndActiveTrue(String pileId, CarState carState);
+
+    long countByPileIdAndActiveTrueAndCarStateIn(String pileId, Collection<CarState> carStates);
+
+    List<ChargingRequest> findByPileIdAndActiveTrueAndCarStateIn(
+            String pileId, Collection<CarState> carStates);
+
+    List<ChargingRequest> findByCarStateAndActiveTrue(CarState carState);
+
+    List<ChargingRequest> findByRequestModeAndActiveTrueAndCarStateIn(
+            ChargingMode mode, Collection<CarState> carStates);
 }
