@@ -20,16 +20,10 @@ import type {
 } from '../api/types';
 
 const stateColorMap: Record<PileWorkingState, string> = {
-  OFF: 'default',
-  IDLE: 'success',
-  CHARGING: 'processing',
-  FAULT: 'error',
+  OFF: 'default', IDLE: 'success', CHARGING: 'processing', WAITING_UNPLUG: 'warning', FAULT: 'error',
 };
 const stateLabelMap: Record<PileWorkingState, string> = {
-  OFF: '关机',
-  IDLE: '空闲',
-  CHARGING: '充电中',
-  FAULT: '故障',
+  OFF: '关机', IDLE: '空闲', CHARGING: '充电中', WAITING_UNPLUG: '待拔枪', FAULT: '故障',
 };
 
 export default function PileManagementPage() {

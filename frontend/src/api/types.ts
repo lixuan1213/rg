@@ -1,6 +1,6 @@
 export type ChargingMode = 'FAST' | 'SLOW';
-export type CarState = 'WAITING' | 'QUEUED' | 'CHARGING' | 'COMPLETED' | 'CANCELLED';
-export type PileWorkingState = 'OFF' | 'IDLE' | 'CHARGING' | 'FAULT';
+export type CarState = 'WAITING' | 'QUEUED' | 'CHARGING' | 'PENDING_UNPLUG' | 'COMPLETED' | 'CANCELLED';
+export type PileWorkingState = 'OFF' | 'IDLE' | 'CHARGING' | 'WAITING_UNPLUG' | 'FAULT';
 export type SchedulingStrategy = 'TIME_ORDER' | 'PRIORITY';
 export type TimePeriod = 'PEAK' | 'NORMAL' | 'VALLEY';
 
@@ -53,7 +53,9 @@ export interface ChargingStateResponse {
   chargedAmount: number;
   carState: CarState;
   startTime: string | null;
+  elapsedSeconds: number | null;
   estimatedRemainingMinutes: number | null;
+  reminderMessage: string | null;
 }
 
 export interface QueueStateResponse {

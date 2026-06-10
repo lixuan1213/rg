@@ -13,10 +13,10 @@ import {
 } from '../api/chargingApi';
 
 const carStateLabel: Record<CarState, string> = {
-  WAITING: '等待中', QUEUED: '已排队', CHARGING: '充电中', COMPLETED: '已完成', CANCELLED: '已取消',
+  WAITING: '等待中', QUEUED: '已排队', CHARGING: '充电中', PENDING_UNPLUG: '待拔枪', COMPLETED: '已完成', CANCELLED: '已取消',
 };
 const carStateColor: Record<CarState, string> = {
-  WAITING: 'default', QUEUED: 'warning', CHARGING: 'processing', COMPLETED: 'success', CANCELLED: 'error',
+  WAITING: 'default', QUEUED: 'warning', CHARGING: 'processing', PENDING_UNPLUG: 'orange', COMPLETED: 'success', CANCELLED: 'error',
 };
 const modeLabel: Record<ChargingMode, string> = { FAST: '快充', SLOW: '慢充' };
 
@@ -113,7 +113,7 @@ export default function ChargingOperationPage() {
   };
 
   const canStart = state?.carState === 'QUEUED' && !!state?.chargePileNum;
-  const canEnd = state?.carState === 'CHARGING' && !!state?.chargePileNum;
+  const canEnd = state && (state.carState === 'CHARGING' || state.carState === 'PENDING_UNPLUG') && !!state?.chargePileNum;
   const canModify = state && (state.carState === 'WAITING' || state.carState === 'QUEUED');
 
   return (
@@ -164,6 +164,10 @@ export default function ChargingOperationPage() {
               <Descriptions.Item label="预计剩余(分)">{state.estimatedRemainingMinutes ?? '-'}</Descriptions.Item>
             </Descriptions>
 
+            {state.reminderMessage && (
+              <Alert type="warning" message={state.reminderMessage} showIcon style={{ marginTop: 8 }} />
+            )}
+
             <Divider plain>操作</Divider>
 
             <Space size="middle" wrap>
@@ -171,7 +175,7 @@ export default function ChargingOperationPage() {
                 开始充电
               </Button>
               <Button danger type="primary" size="large" disabled={!canEnd} onClick={handleEnd}>
-                结束充电
+                {state.carState === 'PENDING_UNPLUG' ? '拔枪结束' : '结束充电'}
               </Button>
               <Button disabled={!canModify} onClick={() => { amountForm.setFieldsValue({ amount: state.requestAmount }); setAmountModalOpen(true); }}>
                 修改电量
@@ -184,7 +188,9 @@ export default function ChargingOperationPage() {
             {!canStart && !canEnd && state && (
               <Alert style={{ marginTop: 12 }}
                 message={state.carState === 'WAITING' ? '车辆正在等候区，待有空闲充电桩时将自动分配'
-                  : state.carState === 'COMPLETED' ? '充电已完成' : '当前状态无法操作'}
+                  : state.carState === 'COMPLETED' ? '充电已完成，车位已释放'
+                  : state.carState === 'PENDING_UNPLUG' ? '充电已满，请拔枪结束'
+                  : '当前状态无法操作'}
                 type="info" showIcon />
             )}
           </>
