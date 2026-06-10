@@ -62,6 +62,7 @@ public class SchedulingService {
     @Transactional
     public void dispatchWaitingCars(ChargingMode mode, boolean rebalanceAfter) {
         syncPileOccupiedSpots(mode);
+
         List<ChargingRequest> waitingCars = getOrderedWaitingCars(mode);
         for (ChargingRequest request : waitingCars) {
             Optional<ChargingPile> pileOpt = selectPileForDispatch(mode, request);
@@ -78,8 +79,7 @@ public class SchedulingService {
 
     /**
      * 桩间再平衡：将仅排队（未插枪）的车辆迁到能更快开始充电的桩。
-     * 按「完成时间缩短量」决策，而非仅比较车位占用数——避免 F1 空闲、F2 充电中
-     * 但两桩占用数相同（如均为 2）时，排在充电车辆后的 bupt3 无法迁到 F1 的问题。
+     * 三重枚举找收益最大
      */
     @Transactional
     public void rebalanceQueuedCars(ChargingMode mode) {
@@ -185,6 +185,7 @@ public class SchedulingService {
             pile.setWorkingState(PileWorkingState.IDLE);
         }
     }
+
 
     /** 充电桩故障：中断中的车辆退回等候区并触发再调度 */
     @Transactional
@@ -339,8 +340,7 @@ public class SchedulingService {
 
     /**
      * 估算车辆在桩上开始充电前需要等待的时间（秒）。
-     * 包含：当前充电剩余时间、排在前面车辆的充电时间、等待拔枪阻塞时间。
-     * SHORTEST_TIME 下按申请电量升序计算排队先后，而非物理队尾顺序。
+     * 包含：当前充电剩余时间、排在前面车辆的充电时间、等待拔枪阻塞时间
      */
     private double estimateWaitBeforeChargeSeconds(ChargingPile pile, ChargingRequest subject) {
         double waitSeconds = 0.0;
@@ -395,6 +395,7 @@ public class SchedulingService {
     private boolean isSameRequest(ChargingRequest left, ChargingRequest right) {
         return left.getId() != null && left.getId().equals(right.getId());
     }
+
 
     /** 估算车辆充满申请电量所需的充电时间（秒） */
     private double estimateChargeSeconds(ChargingRequest request, ChargingPile pile) {
