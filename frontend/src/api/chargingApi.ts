@@ -13,6 +13,7 @@ import type {
   StartChargingRequest,
   EndChargingRequest,
   ResultResponse,
+  EndChargingResponse,
   ChargingMode,
 } from './types';
 
@@ -29,7 +30,7 @@ export function modifyMode(data: ModifyModeRequest) {
 }
 
 export function queryCarState(carId: string) {
-  return client.get<ApiResponse<CarStateResponse>>(`/api/charging/car-state/${carId}`);
+  return client.get<ApiResponse<CarStateResponse>>('/api/charging/car-state', { params: { carId } });
 }
 
 export function startCharging(data: StartChargingRequest) {
@@ -37,11 +38,11 @@ export function startCharging(data: StartChargingRequest) {
 }
 
 export function queryChargingState(carId: string) {
-  return client.get<ApiResponse<ChargingStateResponse>>(`/api/charging/state/${carId}`);
+  return client.get<ApiResponse<ChargingStateResponse>>('/api/charging/state', { params: { carId } });
 }
 
 export function endCharging(data: EndChargingRequest) {
-  return client.post<ApiResponse<ResultResponse>>('/api/charging/end', data);
+  return client.post<ApiResponse<EndChargingResponse>>('/api/charging/end', data);
 }
 
 export function requestBill(carId: string, date: string) {

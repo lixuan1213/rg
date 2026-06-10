@@ -12,6 +12,17 @@ export interface ApiResponse<T> {
 
 export interface ResultResponse {
   result: number;
+  message: string;
+}
+
+export interface EndChargingResponse {
+  result: number;
+  message: string;
+  billId: number | null;
+  chargePileNum: string | null;
+  chargeAmount: number | null;
+  chargeDuration: number | null;
+  totalFee: number | null;
 }
 
 export interface ChargingRequestDto {
@@ -75,9 +86,9 @@ export interface BillDetailResponse {
   chargeDuration: number;
   startTime: string;
   endTime: string;
-  totalChargeFee: number;
-  totalServiceFee: number;
-  totalFee: number;
+  chargeFee: number;
+  serviceFee: number;
+  subtotalFee: number;
 }
 
 export interface PileStateResponse {

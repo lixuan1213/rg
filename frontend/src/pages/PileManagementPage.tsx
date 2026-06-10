@@ -67,7 +67,7 @@ export default function PileManagementPage() {
   }) => {
     try {
       await setParameters(values as { priceRules: BillingRuleDto[]; schedulingStrategy: SchedulingStrategy | null });
-      message.success('参数设置成功');
+      message.success('设置成功');
       setParamModalOpen(false);
     } catch { /* handled */ }
   };
@@ -150,7 +150,7 @@ export default function PileManagementPage() {
         title="充电桩管理"
         extra={
           <Button type="primary" onClick={() => setParamModalOpen(true)}>
-            系统参数设置
+            调度策略设置
           </Button>
         }
       >
@@ -158,7 +158,7 @@ export default function PileManagementPage() {
       </Card>
 
       <Modal
-        title="系统参数设置"
+        title="调度策略设置"
         open={paramModalOpen}
         onCancel={() => setParamModalOpen(false)}
         footer={null}
