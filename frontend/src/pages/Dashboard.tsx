@@ -10,16 +10,16 @@ import type {
 } from '../api/types';
 
 const stateColorMap: Record<PileWorkingState, string> = {
-  OFF: 'default', IDLE: 'success', CHARGING: 'processing', FAULT: 'error',
+  OFF: 'default', IDLE: 'success', CHARGING: 'processing', WAITING_UNPLUG: 'warning', FAULT: 'error',
 };
 const stateLabelMap: Record<PileWorkingState, string> = {
-  OFF: '关机', IDLE: '空闲', CHARGING: '充电中', FAULT: '故障',
+  OFF: '关机', IDLE: '空闲', CHARGING: '充电中', WAITING_UNPLUG: '待拔枪', FAULT: '故障',
 };
 const carStateLabel: Record<CarState, string> = {
-  WAITING: '等待中', QUEUED: '已排队', CHARGING: '充电中', COMPLETED: '已完成', CANCELLED: '已取消',
+  WAITING: '等待中', QUEUED: '已排队', CHARGING: '充电中', PENDING_UNPLUG: '待拔枪', COMPLETED: '已完成', CANCELLED: '已取消',
 };
 const carStateColor: Record<CarState, string> = {
-  WAITING: 'default', QUEUED: 'warning', CHARGING: 'processing', COMPLETED: 'success', CANCELLED: 'error',
+  WAITING: 'default', QUEUED: 'warning', CHARGING: 'processing', PENDING_UNPLUG: 'orange', COMPLETED: 'success', CANCELLED: 'error',
 };
 
 const PILE_POWER: Record<string, number> = { FAST: 60, SLOW: 7 };
