@@ -1,18 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Card, Col, Row, Statistic, Table, Tag, Spin, Input, Descriptions, Divider, message } from 'antd';
+import { Card, Col, Row, Statistic, Table, Tag, Spin, Input, Button, Descriptions, Divider, Space } from 'antd';
 import {
-  ThunderboltOutlined,
-  ClockCircleOutlined,
-  DashboardOutlined,
-  CarOutlined,
+  ThunderboltOutlined, ClockCircleOutlined, DashboardOutlined, CarOutlined,
 } from '@ant-design/icons';
 import { queryAllPileStates } from '../api/pileApi';
 import { queryQueueState, queryChargingState, queryCarState } from '../api/chargingApi';
 import type {
-  PileStateResponse,
-  QueueStateResponse,
-  PileWorkingState,
-  CarState,
+  PileStateResponse, QueueStateResponse, PileWorkingState, CarState, ChargingStateResponse,
 } from '../api/types';
 
 const stateColorMap: Record<PileWorkingState, string> = {
@@ -31,14 +25,8 @@ const carStateColor: Record<CarState, string> = {
 const PILE_POWER: Record<string, number> = { FAST: 60, SLOW: 7 };
 
 interface QueueDetail {
-  carId: string;
-  carCapacity: number;
-  requestAmount: number;
-  waitTime: number;
-  pileId: string | null;
-  aheadCount: number;
-  estimatedWait: number | null;
-  queueNum: number | null;
+  carId: string; carCapacity: number; requestAmount: number; waitTime: number;
+  pileId: string | null; aheadCount: number; estimatedWait: number | null; queueNum: number | null;
 }
 
 export default function Dashboard() {
@@ -46,126 +34,82 @@ export default function Dashboard() {
   const [fastDetail, setFastDetail] = useState<QueueDetail[]>([]);
   const [slowDetail, setSlowDetail] = useState<QueueDetail[]>([]);
   const [loading, setLoading] = useState(false);
-  const [lookupCarId, setLookupCarId] = useState('');
-  const [lookupResult, setLookupResult] = useState<{
-    carState: CarState;
-    queueNum: number | null;
-    carNumberBeforePosition: number;
-    requestTime: string;
-  } | null>(null);
-  const [lookupLoading, setLookupLoading] = useState(false);
+
+  // query forms
+  const [carIdInput, setCarIdInput] = useState('');
+  const [carStateResult, setCarStateResult] = useState<{ carState: CarState; queueNum: number | null; carNumberBeforePosition: number; requestTime: string } | null>(null);
+  const [stateCarId, setStateCarId] = useState('');
+  const [chargeStateResult, setChargeStateResult] = useState<ChargingStateResponse | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [pileRes, fastQRes, slowQRes] = await Promise.all([
-        queryAllPileStates(),
-        queryQueueState('FAST'),
-        queryQueueState('SLOW'),
+        queryAllPileStates(), queryQueueState('FAST'), queryQueueState('SLOW'),
       ]);
       setPiles(pileRes.data.data);
-
       const enrichQueue = async (queue: QueueStateResponse[], mode: 'FAST' | 'SLOW') => {
         if (queue.length === 0) return [] as QueueDetail[];
         const power = PILE_POWER[mode] ?? 60;
-        const details = await Promise.all(
-          queue.map(async (car, idx) => {
-            try {
-              const [stRes, csRes] = await Promise.all([
-                queryChargingState(car.carId),
-                queryCarState(car.carId),
-              ]);
-              const st = stRes.data.data;
-              const cs = csRes.data.data;
-              let estimatedWait: number | null = null;
-              if (cs.carNumberBeforePosition > 0) {
-                estimatedWait = 0;
-                for (let j = idx - cs.carNumberBeforePosition; j < idx; j++) {
-                  if (j >= 0 && j < queue.length) estimatedWait += queue[j].requestAmount / power * 60;
-                }
-                estimatedWait = Math.ceil(estimatedWait);
+        return Promise.all(queue.map(async (car, idx) => {
+          try {
+            const [st, cs] = await Promise.all([queryChargingState(car.carId), queryCarState(car.carId)]);
+            let ew: number | null = null;
+            if (cs.data.data.carNumberBeforePosition > 0) {
+              ew = 0;
+              for (let j = idx - cs.data.data.carNumberBeforePosition; j < idx; j++) {
+                if (j >= 0 && j < queue.length) ew += queue[j].requestAmount / power * 60;
               }
-              return {
-                carId: car.carId,
-                carCapacity: car.carCapacity,
-                requestAmount: car.requestAmount,
-                waitTime: car.waitTime,
-                pileId: st.chargePileNum ?? null,
-                aheadCount: cs.carNumberBeforePosition,
-                estimatedWait,
-                queueNum: cs.queueNum,
-              };
-            } catch {
-              return {
-                carId: car.carId, carCapacity: car.carCapacity, requestAmount: car.requestAmount,
-                waitTime: car.waitTime, pileId: null, aheadCount: idx, estimatedWait: null, queueNum: null,
-              };
+              ew = Math.ceil(ew);
             }
-          })
-        );
-        return details;
+            return { carId: car.carId, carCapacity: car.carCapacity, requestAmount: car.requestAmount,
+              waitTime: car.waitTime, pileId: st.data.data.chargePileNum ?? null,
+              aheadCount: cs.data.data.carNumberBeforePosition, estimatedWait: ew, queueNum: cs.data.data.queueNum };
+          } catch {
+            return { carId: car.carId, carCapacity: car.carCapacity, requestAmount: car.requestAmount,
+              waitTime: car.waitTime, pileId: null, aheadCount: idx, estimatedWait: null, queueNum: null };
+          }
+        }));
       };
-
-      const [fd, sd] = await Promise.all([
-        enrichQueue(fastQRes.data.data, 'FAST'),
-        enrichQueue(slowQRes.data.data, 'SLOW'),
-      ]);
-      setFastDetail(fd);
-      setSlowDetail(sd);
+      const [fd, sd] = await Promise.all([enrichQueue(fastQRes.data.data, 'FAST'), enrichQueue(slowQRes.data.data, 'SLOW')]);
+      setFastDetail(fd); setSlowDetail(sd);
     } catch { /* handled */ }
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    fetchData();
-    const timer = setInterval(fetchData, 10000);
-    return () => clearInterval(timer);
-  }, [fetchData]);
+  useEffect(() => { fetchData(); const t = setInterval(fetchData, 10000); return () => clearInterval(t); }, [fetchData]);
 
-  const handleLookup = async () => {
-    if (!lookupCarId.trim()) return;
-    setLookupLoading(true);
-    try {
-      setLookupResult((await queryCarState(lookupCarId.trim())).data.data);
-    } catch { setLookupResult(null); message.error('未找到该车辆'); }
-    setLookupLoading(false);
+  const handleQueryCarState = async () => {
+    if (!carIdInput.trim()) return;
+    try { setCarStateResult((await queryCarState(carIdInput.trim())).data.data); } catch { setCarStateResult(null); }
+  };
+  const handleQueryChargeState = async () => {
+    if (!stateCarId.trim()) return;
+    try { setChargeStateResult((await queryChargingState(stateCarId.trim())).data.data); } catch { setChargeStateResult(null); }
   };
 
   const allQueueDetails = [...fastDetail, ...slowDetail];
-
   const pileQueueMap = new Map<string, QueueDetail[]>();
-  for (const d of allQueueDetails) {
-    if (d.pileId) {
-      const list = pileQueueMap.get(d.pileId) || [];
-      list.push(d);
-      pileQueueMap.set(d.pileId, list);
-    }
-  }
+  for (const d of allQueueDetails) { if (d.pileId) { const l = pileQueueMap.get(d.pileId) || []; l.push(d); pileQueueMap.set(d.pileId, l); } }
 
-  const totalCharged = piles.reduce((s, p) => s + p.totalCapacity, 0);
-  const totalTime = piles.reduce((s, p) => s + p.totalChargeTime, 0);
-
-  const pileColumns = [
-    { title: '桩编号', dataIndex: 'pileId', key: 'pileId', width: 90 },
-    { title: '状态', dataIndex: 'workingState', key: 'workingState',
-      render: (s: PileWorkingState) => <Tag color={stateColorMap[s]}>{stateLabelMap[s]}</Tag> },
-    { title: '模式', key: 'mode', width: 60,
-      render: (_: unknown, r: PileStateResponse) => r.pileId?.startsWith('F') ? '快充' : '慢充' },
-    { title: '排队', key: 'queued', width: 50,
-      render: (_: unknown, r: PileStateResponse) => pileQueueMap.get(r.pileId)?.length ?? 0 },
-    { title: '充电次数', dataIndex: 'totalChargeNum', key: 'totalChargeNum', width: 80 },
-    { title: '时长(分)', dataIndex: 'totalChargeTime', key: 'totalChargeTime', width: 80 },
-    { title: '电量(kWh)', dataIndex: 'totalCapacity', key: 'totalCapacity', width: 80, render: (v: number) => v.toFixed(1) },
+  const queueColumns = [
+    { title: '车辆', dataIndex: 'carId', key: 'carId', width: 80 },
+    { title: '容量', dataIndex: 'carCapacity', key: 'carCapacity', width: 60 },
+    { title: '请求', dataIndex: 'requestAmount', key: 'requestAmount', width: 60 },
+    { title: '已等', dataIndex: 'waitTime', key: 'waitTime', width: 50 },
+    { title: '桩', dataIndex: 'pileId', key: 'pileId', width: 60, render: (v: string | null) => v ?? '-' },
+    { title: '前方', dataIndex: 'aheadCount', key: 'aheadCount', width: 45 },
+    { title: '预计', dataIndex: 'estimatedWait', key: 'estimatedWait', width: 50, render: (v: number | null) => v ?? '-' },
   ];
 
-  const queueSubColumns = [
-    { title: '排队号', dataIndex: 'queueNum', key: 'queueNum', width: 60 },
-    { title: '车辆ID', dataIndex: 'carId', key: 'carId', width: 80 },
-    { title: '容量(kWh)', dataIndex: 'carCapacity', key: 'carCapacity', width: 80 },
-    { title: '请求(kWh)', dataIndex: 'requestAmount', key: 'requestAmount', width: 80 },
-    { title: '已等(分)', dataIndex: 'waitTime', key: 'waitTime', width: 70 },
-    { title: '前方', dataIndex: 'aheadCount', key: 'aheadCount', width: 50 },
-    { title: '预计(分)', dataIndex: 'estimatedWait', key: 'estimatedWait', width: 70, render: (v: number | null) => v ?? '-' },
+  const pileColumns = [
+    { title: '桩', dataIndex: 'pileId', key: 'pileId', width: 60 },
+    { title: '状态', dataIndex: 'workingState', key: 'workingState', render: (s: PileWorkingState) => <Tag color={stateColorMap[s]}>{stateLabelMap[s]}</Tag> },
+    { title: '模式', key: 'mode', width: 50, render: (_: unknown, r: PileStateResponse) => r.pileId?.startsWith('F') ? '快' : '慢' },
+    { title: '排队', key: 'queued', width: 45, render: (_: unknown, r: PileStateResponse) => pileQueueMap.get(r.pileId)?.length ?? 0 },
+    { title: '次数', dataIndex: 'totalChargeNum', key: 'n', width: 50 },
+    { title: '时长', dataIndex: 'totalChargeTime', key: 't', width: 55 },
+    { title: '电量', dataIndex: 'totalCapacity', key: 'c', width: 55, render: (v: number) => v.toFixed(1) },
   ];
 
   return (
@@ -173,69 +117,72 @@ export default function Dashboard() {
       <Row gutter={[16, 16]}>
         <Col xs={12} sm={6}><Card><Statistic title="充电桩" value={piles.length} prefix={<DashboardOutlined />} /></Card></Col>
         <Col xs={12} sm={6}><Card><Statistic title="排队车辆" value={allQueueDetails.length} prefix={<CarOutlined />} /></Card></Col>
-        <Col xs={12} sm={6}><Card><Statistic title="总充电量(kWh)" value={totalCharged.toFixed(1)} prefix={<ThunderboltOutlined />} /></Card></Col>
-        <Col xs={12} sm={6}><Card><Statistic title="总时长(分)" value={totalTime} prefix={<ClockCircleOutlined />} /></Card></Col>
+        <Col xs={12} sm={6}><Card><Statistic title="总充电量" value={piles.reduce((s,p)=>s+p.totalCapacity,0).toFixed(1)} suffix="kWh" prefix={<ThunderboltOutlined />} /></Card></Col>
+        <Col xs={12} sm={6}><Card><Statistic title="总时长" value={piles.reduce((s,p)=>s+p.totalChargeTime,0)} suffix="分" prefix={<ClockCircleOutlined />} /></Card></Col>
       </Row>
 
       <Card title="充电桩状态" style={{ marginTop: 16 }}>
-        <Table
-          dataSource={piles}
-          rowKey="pileId"
-          pagination={false}
-          size="small"
-          columns={pileColumns}
+        <Table dataSource={piles} rowKey="pileId" pagination={false} size="small" columns={pileColumns}
           expandable={{
-            expandedRowRender: (record) => {
-              const qCars = pileQueueMap.get(record.pileId);
-              if (!qCars || qCars.length === 0) {
-                return <Tag>暂无排队车辆</Tag>;
-              }
-              const sorted = [...qCars].sort((a, b) => (a.queueNum ?? 0) - (b.queueNum ?? 0));
-              return (
-                <div>
-                  <Tag color="blue" style={{ marginBottom: 8 }}>
-                    充电中: {record.workingState === 'CHARGING' ? '有车正在充电' : '无'}
-                  </Tag>
-                  <Table
-                    dataSource={sorted}
-                    rowKey="carId"
-                    pagination={false}
-                    size="small"
-                    columns={queueSubColumns}
-                    title={() => <strong>排队车辆（按排队号排序）</strong>}
-                    scroll={{ x: 500 }}
-                  />
-                </div>
-              );
-            },
-            rowExpandable: () => true,
+            expandedRowRender: (r) => {
+              const cs = pileQueueMap.get(r.pileId);
+              if (!cs?.length) return <Tag>无排队车辆</Tag>;
+              return <Table dataSource={[...cs].sort((a,b)=>(a.queueNum??0)-(b.queueNum??0))} rowKey="carId" pagination={false} size="small"
+                columns={[{title:'排队号',dataIndex:'queueNum',width:60},{title:'车辆ID',dataIndex:'carId',width:80},{title:'请求',dataIndex:'requestAmount',width:60},{title:'已等',dataIndex:'waitTime',width:50},{title:'预计',dataIndex:'estimatedWait',width:50,render:(v:number|null)=>v??'-'}]}
+                title={()=><strong>排队车辆</strong>} scroll={{x:300}} />;
+            }
           }}
         />
       </Card>
 
-      <Divider />
+      <Row gutter={16} style={{ marginTop: 16 }}>
+        <Col xs={24} md={12}>
+          <Card title={`快充排队 (${fastDetail.length}辆)`} extra={<Tag color="blue">FAST</Tag>}>
+            <Table dataSource={fastDetail} rowKey="carId" pagination={false} size="small" scroll={{x:500}} columns={queueColumns} />
+          </Card>
+        </Col>
+        <Col xs={24} md={12}>
+          <Card title={`慢充排队 (${slowDetail.length}辆)`} extra={<Tag color="green">SLOW</Tag>}>
+            <Table dataSource={slowDetail} rowKey="carId" pagination={false} size="small" scroll={{x:500}} columns={queueColumns} />
+          </Card>
+        </Col>
+      </Row>
 
-      <Card title="等候区（未分配桩的车辆查询）" extra={<Tag>输入carId查找</Tag>}>
-        <Input.Search
-          placeholder="输入车辆ID"
-          value={lookupCarId}
-          onChange={e => setLookupCarId(e.target.value)}
-          onSearch={handleLookup}
-          enterButton="查询"
-          loading={lookupLoading}
-        />
-        {lookupResult && (
-          <Descriptions bordered style={{ marginTop: 16 }} column={4} size="small">
-            <Descriptions.Item label="状态">
-              <Tag color={carStateColor[lookupResult.carState]}>{carStateLabel[lookupResult.carState]}</Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="等候位置">
-              {lookupResult.carState === 'WAITING' ? `第 ${lookupResult.carNumberBeforePosition + 1} 位` : '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="排队号">{lookupResult.queueNum ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="请求时间">{lookupResult.requestTime}</Descriptions.Item>
-          </Descriptions>
-        )}
+      <Divider />
+      <Card title="状态查询">
+        <Row gutter={[16, 16]}>
+          <Col xs={24} md={12}>
+            <Card size="small" title="查询排队状态">
+              <Space>
+                <Input placeholder="车辆ID" value={carIdInput} onChange={e => setCarIdInput(e.target.value)} style={{ width: 120 }} />
+                <Button onClick={handleQueryCarState}>查询</Button>
+              </Space>
+              {carStateResult && (
+                <Descriptions style={{ marginTop: 8 }} column={1} size="small" bordered>
+                  <Descriptions.Item label="状态"><Tag color={carStateColor[carStateResult.carState]}>{carStateLabel[carStateResult.carState]}</Tag></Descriptions.Item>
+                  <Descriptions.Item label="排队号">{carStateResult.queueNum ?? '-'}</Descriptions.Item>
+                  <Descriptions.Item label="前方">{carStateResult.carNumberBeforePosition}</Descriptions.Item>
+                </Descriptions>
+              )}
+            </Card>
+          </Col>
+          <Col xs={24} md={12}>
+            <Card size="small" title="查询充电详细状态">
+              <Space>
+                <Input placeholder="车辆ID" value={stateCarId} onChange={e => setStateCarId(e.target.value)} style={{ width: 120 }} />
+                <Button onClick={handleQueryChargeState}>查询</Button>
+              </Space>
+              {chargeStateResult && (
+                <Descriptions style={{ marginTop: 8 }} column={1} size="small" bordered>
+                  <Descriptions.Item label="状态"><Tag color={carStateColor[chargeStateResult.carState]}>{carStateLabel[chargeStateResult.carState]}</Tag></Descriptions.Item>
+                  <Descriptions.Item label="桩">{chargeStateResult.chargePileNum ?? '-'}</Descriptions.Item>
+                  <Descriptions.Item label="请求/已充(kWh)">{chargeStateResult.requestAmount} / {chargeStateResult.chargedAmount.toFixed(1)}</Descriptions.Item>
+                  <Descriptions.Item label="剩余(分)">{chargeStateResult.estimatedRemainingMinutes ?? '-'}</Descriptions.Item>
+                </Descriptions>
+              )}
+            </Card>
+          </Col>
+        </Row>
       </Card>
     </Spin>
   );
