@@ -356,12 +356,18 @@ public class ChargingRequestService {
         LocalDateTime now = LocalDateTime.now();
         return requests.stream()
                 .sorted(order)
-                .map(req -> new QueueStateResponse(
-                        req.getCarId(),
-                        req.getCarCapacity(),
-                        req.getRequestAmount(),
-                        ChronoUnit.MINUTES.between(req.getRequestTime(), now)
-                ))
+                .map(req -> {
+                    long waitSeconds = schedulingService.estimateRemainingWaitSeconds(req);
+                    Long estimatedMinutes = waitSeconds < 0 ? null
+                            : (long) Math.ceil(waitSeconds / 60.0);
+                    return new QueueStateResponse(
+                            req.getCarId(),
+                            req.getCarCapacity(),
+                            req.getRequestAmount(),
+                            ChronoUnit.MINUTES.between(req.getRequestTime(), now),
+                            estimatedMinutes
+                    );
+                })
                 .toList();
     }
 

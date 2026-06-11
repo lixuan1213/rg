@@ -23,3 +23,6 @@ charging:
     fast-pile-count: 2
     slow-pile-count: 3
     parking-spots-per-pile: 4
+  admin:
+    username: admin
+    password: admin123

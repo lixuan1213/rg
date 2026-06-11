@@ -1,26 +1,22 @@
-package com.bupt.charging.entity;
+package com.bupt.charging.dto.response;
 
-import jakarta.persistence.*;
+import com.bupt.charging.entity.CarAccount;
 
-@Entity
-@Table(name = "car_account")
-public class CarAccount {
+public class AccountSummaryResponse {
 
-    @Id
-    @Column(name = "car_id", length = 32)
     private String carId;
-
-    @Column(nullable = false, unique = true, length = 64)
     private String userName;
-
-    @Column(name = "car_capacity", nullable = false)
     private Double carCapacity;
+    private boolean registered;
 
-    @Column(length = 128)
-    private String password;
-
-    @Column(nullable = false)
-    private boolean registered = false;
+    public static AccountSummaryResponse from(CarAccount account) {
+        AccountSummaryResponse response = new AccountSummaryResponse();
+        response.setCarId(account.getCarId());
+        response.setUserName(account.getUserName());
+        response.setCarCapacity(account.getCarCapacity());
+        response.setRegistered(account.isRegistered());
+        return response;
+    }
 
     public String getCarId() { return carId; }
     public void setCarId(String carId) { this.carId = carId; }
@@ -28,8 +24,6 @@ public class CarAccount {
     public void setUserName(String userName) { this.userName = userName; }
     public Double getCarCapacity() { return carCapacity; }
     public void setCarCapacity(Double carCapacity) { this.carCapacity = carCapacity; }
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
     public boolean isRegistered() { return registered; }
     public void setRegistered(boolean registered) { this.registered = registered; }
 }

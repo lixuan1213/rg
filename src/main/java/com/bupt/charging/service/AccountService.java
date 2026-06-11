@@ -1,11 +1,18 @@
 package com.bupt.charging.service;
 
 import com.bupt.charging.dto.request.CreateAccountRequest;
+import com.bupt.charging.dto.request.LoginRequest;
 import com.bupt.charging.dto.request.SetPasswordRequest;
+import com.bupt.charging.dto.response.AccountSummaryResponse;
+import com.bupt.charging.dto.response.LoginResponse;
 import com.bupt.charging.entity.CarAccount;
 import com.bupt.charging.repository.CarAccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class AccountService {
@@ -18,7 +25,8 @@ public class AccountService {
 
     @Transactional
     public boolean createNewAccount(CreateAccountRequest request) {
-        if (carAccountRepository.existsById(request.getCarId())) {
+        if (carAccountRepository.existsById(request.getCarId())
+                || carAccountRepository.existsByUserName(request.getUserName())) {
             return false;
         }
         CarAccount account = new CarAccount();
@@ -39,6 +47,22 @@ public class AccountService {
                     return true;
                 })
                 .orElse(false);
+    }
+
+    public Optional<LoginResponse> login(LoginRequest request) {
+        return carAccountRepository.findByUserName(request.getUserName())
+                .filter(account -> account.isRegistered())
+                .filter(account -> Objects.equals(account.getPassword(), request.getPassword()))
+                .map(account -> new LoginResponse(
+                        account.getCarId(),
+                        account.getUserName(),
+                        account.getCarCapacity()));
+    }
+
+    public List<AccountSummaryResponse> listAllAccounts() {
+        return carAccountRepository.findAll().stream()
+                .map(AccountSummaryResponse::from)
+                .toList();
     }
 
     public CarAccount getAccount(String carId) {

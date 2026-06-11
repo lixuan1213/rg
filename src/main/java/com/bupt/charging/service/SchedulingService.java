@@ -267,6 +267,30 @@ public class SchedulingService {
     }
 
     /**
+     * 估算车辆距离开始充电还需等待的秒数。
+     * CHARGING/PENDING_UNPLUG 返回 0；QUEUED 按已分配桩估算；WAITING 模拟分配到最优桩后估算。
+     *
+     * @return 等待秒数；-1 表示当前无可用桩、无法估算
+     */
+    public long estimateRemainingWaitSeconds(ChargingRequest request) {
+        if (request.getCarState() == CarState.CHARGING
+                || request.getCarState() == CarState.PENDING_UNPLUG) {
+            return 0L;
+        }
+        if (request.getCarState() == CarState.QUEUED && request.getPileId() != null) {
+            return chargingPileRepository.findById(request.getPileId())
+                    .map(pile -> (long) estimateWaitBeforeChargeSeconds(pile, request))
+                    .orElse(0L);
+        }
+        if (request.getCarState() == CarState.WAITING) {
+            return selectPileForDispatch(request.getRequestMode(), request)
+                    .map(pile -> (long) estimateWaitBeforeChargeSeconds(pile, request))
+                    .orElse(-1L);
+        }
+        return -1L;
+    }
+
+    /**
      * 选取有空余等候车位的充电桩，优先选择当前排队最少的桩。
      * 用于时间顺序与优先级策略。
      */
