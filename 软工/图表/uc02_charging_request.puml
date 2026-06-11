@@ -1,0 +1,39 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title E_chargingRequest(car_Id, Request_Amount, Request_Mode) 交互图
+
+actor "车主" as User
+participant "ChargingController" as CC
+participant "ChargingRequestService" as CRS
+participant "AccountService" as AS
+participant "SchedulingService" as SS
+database "ChargingRequestRepository" as CRR
+database "CarAccountRepository" as CAR
+
+User -> CC: POST /api/charging/request\nE_chargingRequest(car_Id, Request_Amount, Request_Mode)
+activate CC
+CC -> CRS: submitChargingRequest(dto)
+activate CRS
+CRS -> AS: getAccount(car_Id)
+activate AS
+AS -> CAR: findById(car_Id)
+CAR --> AS: CarAccount
+deactivate AS
+CRS -> CRS: 验证 account.isRegistered()
+CRS -> CRR: findFirstByCarIdAndActiveTrue(car_Id)
+CRR --> CRS: null (无活跃请求)
+CRS -> CRS: new ChargingRequest()\n设置 carId, requestAmount, requestMode\ncarState=WAITING, requestTime=now
+CRS -> CRR: save(ChargingRequest)
+CRR --> CRS: request
+CRS -> SS: dispatchWaitingCars(requestMode)
+activate SS
+SS -> SS: getOrderedWaitingCars()\n遍历空闲桩 → 分配
+SS -> CRR: save(request) 更新 carState=QUEUED
+deactivate SS
+CRS -> CRS: refreshQueueNumbers(requestMode)
+CRS --> CC: ChargingRequestResponse(carPosition, carState, queueNum, requestTime)
+deactivate CRS
+CC --> User: Return(car_position, car_state, queue_Num, request_time)
+deactivate CC
+
+@enduml

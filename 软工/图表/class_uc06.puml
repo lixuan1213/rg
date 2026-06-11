@@ -1,0 +1,37 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title UC_06 查看充电桩/队列状态——静态结构类图
+
+class ChargingPileController {
+  + queryPileState(pileId): ApiResponse
+  + queryAllPileStates(): ApiResponse
+}
+
+class ChargingPileService {
+  + queryPileState(pileId): PileStateResponse
+  + queryAllPileStates(): List<PileStateResponse>
+}
+
+class ChargingController {
+  + queryQueueState(mode): ApiResponse
+}
+
+class ChargingRequestService {
+  + queryQueueState(mode): List<QueueStateResponse>
+}
+
+class ChargingPileRepository <<Repository>> {
+  + findById(pileId): Optional<ChargingPile>
+  + findAll(): List<ChargingPile>
+}
+
+class ChargingRequestRepository <<Repository>> {
+  + findByRequestModeAndCarStateAndActiveTrueOrderByRequestTimeAsc()
+}
+
+ChargingPileController --> ChargingPileService : 依赖
+ChargingPileService --> ChargingPileRepository : 依赖
+ChargingController --> ChargingRequestService : 依赖
+ChargingRequestService --> ChargingRequestRepository : 依赖
+
+@enduml

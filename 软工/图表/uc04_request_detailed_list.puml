@@ -1,0 +1,31 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title Request_DetailedList(Bill_Id) 交互图
+
+actor "车主" as User
+participant "ChargingController" as CC
+participant "ChargingRequestService" as CRS
+participant "BillingService" as BS
+database "BillRepository" as BR
+database "H2 DB" as DB
+
+User -> CC: GET /api/charging/bill/{billId}\nRequest_DetailedList(Bill_Id)
+activate CC
+CC -> CRS: requestDetailedList(billId)
+activate CRS
+CRS -> BS: getBill(billId)
+activate BS
+BS -> BR: findById(billId)
+activate BR
+BR -> DB: SELECT * FROM bill WHERE bill_id=?
+DB --> BR: Bill
+deactivate BR
+BS --> CRS: Bill
+deactivate BS
+CRS -> CRS: new BillDetailResponse(\nbill.carId, bill.date, bill.billId,\nbill.chargePileNum, bill.chargeAmount,\nbill.chargeDuration, bill.startTime,\nbill.endTime, bill.chargeFee,\nbill.serviceFee, bill.totalFee)
+CRS --> CC: BillDetailResponse
+deactivate CRS
+CC --> User: Return(carId, date, Bill_Id, ChargePileNum,\nChargeAmount, ChargeDuration, StartTime,\nEndTime, ChargeFee, ServiceFee, subtotalFee)
+deactivate CC
+
+@enduml

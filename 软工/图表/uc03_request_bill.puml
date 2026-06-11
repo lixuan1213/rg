@@ -1,0 +1,33 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title Request_Bill(carId, date) 交互图
+
+actor "车主" as User
+participant "ChargingController" as CC
+participant "ChargingRequestService" as CRS
+participant "BillingService" as BS
+database "BillRepository" as BR
+database "H2 DB" as DB
+
+User -> CC: GET /api/charging/bill?carId=&date=\nRequest_Bill(carId, date)
+activate CC
+CC -> CRS: requestBill(carId, date)
+activate CRS
+CRS -> BS: getBills(carId, date)
+activate BS
+BS -> BR: findByCarIdAndDate(carId, date)
+activate BR
+BR -> DB: SELECT * FROM bill WHERE car_id=? AND date=?
+DB --> BR: List<Bill>
+deactivate BR
+BS --> CRS: List<Bill>
+deactivate BS
+loop for each Bill
+    CRS -> CRS: toBillResponse(bill)
+end
+CRS --> CC: List<BillResponse>\n(carId, date, Bill_Id, ChargePileNum,\nChargeAmount, ChargeDuration, StartTime,\nEndTime, TotalChargeFee, TotalServiceFee, TotalFee)
+deactivate CRS
+CC --> User: Return(账单列表)
+deactivate CC
+
+@enduml

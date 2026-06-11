@@ -1,0 +1,25 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title Query_Car_State(car_id) 交互图
+
+actor "车主" as User
+participant "ChargingController" as CC
+participant "ChargingRequestService" as CRS
+database "ChargingRequestRepository" as CRR
+
+User -> CC: GET /api/charging/car-state/{carId}\nQuery_Car_State(car_id)
+activate CC
+CC -> CRS: queryCarState(carId)
+activate CRS
+CRS -> CRR: findFirstByCarIdAndActiveTrue(carId)
+CRR --> CRS: ChargingRequest
+alt carState == QUEUED && queueNum != null
+    CRS -> CRR: countByModeAndStateAndQueueNumLessThan(mode, QUEUED, queueNum)
+    CRR --> CRS: beforeCount
+end
+CRS --> CC: CarStateResponse(before, carState, queueNum, requestTime)
+deactivate CRS
+CC --> User: Return(car_Number_before_position, car_state, queue_Num, request_time)
+deactivate CC
+
+@enduml

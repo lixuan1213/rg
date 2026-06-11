@@ -1,0 +1,41 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title UC_03 查看账单——静态结构类图
+
+class ChargingController {
+  + requestBill(carId, date): ApiResponse
+}
+
+class ChargingRequestService {
+  + requestBill(carId, date): List<BillResponse>
+  - toBillResponse(bill): BillResponse
+}
+
+class BillingService {
+  + getBills(carId, date): List<Bill>
+}
+
+class BillRepository <<Repository>> {
+  + findByCarIdAndDate(carId, date): List<Bill>
+}
+
+class Bill {
+  - billId: Long
+  - carId: String
+  - date: LocalDate
+  - chargePileNum: String
+  - chargeAmount: Double
+  - chargeDuration: Long
+  - startTime: LocalDateTime
+  - endTime: LocalDateTime
+  - chargeFee: Double
+  - serviceFee: Double
+  - totalFee: Double
+}
+
+ChargingController --> ChargingRequestService : 依赖
+ChargingRequestService --> BillingService : 依赖
+BillingService --> BillRepository : 依赖
+BillRepository ..> Bill : 依赖
+
+@enduml

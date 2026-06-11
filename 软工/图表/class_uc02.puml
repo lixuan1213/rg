@@ -1,0 +1,83 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title UC_02 充电申请——静态结构类图
+
+class ChargingController {
+  - chargingRequestService: ChargingRequestService
+  + submitChargingRequest(dto): ApiResponse
+  + modifyAmount(request): ApiResponse
+  + modifyMode(request): ApiResponse
+  + queryCarState(carId): ApiResponse
+  + startCharging(request): ApiResponse
+  + queryChargingState(carId): ApiResponse
+  + endCharging(request): ApiResponse
+}
+
+class ChargingRequestService {
+  - chargingRequestRepository: CRR
+  - accountService: AccountService
+  - chargingPileService: CPS
+  - schedulingService: SchedulingService
+  - billingService: BillingService
+  + submitChargingRequest(dto): Response
+  + modifyAmount(request): Response
+  + modifyMode(request): Response
+  + queryCarState(carId): Response
+  + startCharging(request): Response
+  + queryChargingState(carId): Response
+  + endCharging(request): Response
+}
+
+class ChargingRequestRepository <<Repository>> {
+  + findFirstByCarIdAndActiveTrue(carId)
+  + findByRequestModeAndCarStateAndActiveTrueOrderBy...
+  + countByRequestModeAndCarStateAndActiveTrueAnd...
+  + save(request): ChargingRequest
+}
+
+class ChargingRequest {
+  - id: Long
+  - carId: String
+  - requestAmount: Double
+  - requestMode: ChargingMode
+  - carState: CarState
+  - queueNum: Integer
+  - carPosition: Integer
+  - requestTime: LocalDateTime
+  - pileId: String
+  - carCapacity: Double
+  - priority: Integer
+  - chargedAmount: Double
+  - startTime: LocalDateTime
+  - endTime: LocalDateTime
+  - active: boolean
+}
+
+class SchedulingService {
+  + dispatchWaitingCars(mode)
+  + findAvailablePile(mode)
+  + getSchedulingStrategy()
+}
+
+class ChargingPileService {
+  + getPile(pileId): ChargingPile
+  + savePile(pile): void
+}
+
+class BillingService {
+  + createBill(request, pile): Bill
+}
+
+class AccountService {
+  + getAccount(carId): CarAccount
+}
+
+ChargingController --> ChargingRequestService : 依赖
+ChargingRequestService --> ChargingRequestRepository : 依赖
+ChargingRequestService --> AccountService : 依赖
+ChargingRequestService --> ChargingPileService : 依赖
+ChargingRequestService --> SchedulingService : 依赖
+ChargingRequestService --> BillingService : 依赖
+ChargingRequestRepository ..> ChargingRequest : 依赖
+
+@enduml

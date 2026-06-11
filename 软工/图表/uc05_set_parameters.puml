@@ -1,0 +1,40 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title setParameters(计费规则, 电价数据) 交互图
+
+actor "管理员" as Admin
+participant "ChargingPileController" as CPC
+participant "ChargingPileService" as CPS
+participant "BillingService" as BS
+participant "SchedulingService" as SS
+database "BillingRuleRepository" as BRR
+database "SystemConfigRepository" as SCR
+database "H2 DB" as DB
+
+Admin -> CPC: PUT /api/pile/parameters\nsetParameters(计费规则,电价,调度策略)
+activate CPC
+CPC -> CPS: setParameters(request)
+activate CPS
+loop for each priceRule in request.priceRules
+    CPS -> CPS: new BillingRule()\nset timePeriod, startHour, endHour,\nelectricityPrice, serviceFeeRate
+end
+CPS -> BS: updateBillingRules(rules)
+activate BS
+BS -> BRR: deleteAll()
+BRR -> DB: DELETE FROM billing_rule
+BS -> BRR: saveAll(rules)
+BRR -> DB: INSERT INTO billing_rule ...
+deactivate BS
+alt schedulingStrategy != null
+    CPS -> SS: updateSchedulingStrategy(strategy)
+    activate SS
+    SS -> SCR: save(config)
+    SCR -> DB: UPDATE system_config
+    deactivate SS
+end
+CPS --> CPC: ResultResponse.success()
+deactivate CPS
+CPC --> Admin: Return(0/1)
+deactivate CPC
+
+@enduml

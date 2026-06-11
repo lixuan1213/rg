@@ -1,0 +1,75 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+skinparam packageStyle rectangle
+skinparam componentStyle rectangle
+
+package "前端 (Web/Mobile)" as FrontEnd #LightYellow {
+}
+
+package "Controller 层" as Controller #LightBlue {
+  [AccountController] as AC
+  [ChargingController] as CC
+  [ChargingPileController] as CPC
+}
+
+package "Service 层" as Service #LightGreen {
+  [AccountService] as AS
+  [ChargingRequestService] as CRS
+  [ChargingPileService] as CPS
+  [SchedulingService] as SS
+  [BillingService] as BS
+}
+
+package "Repository 层" as Repo #LightCoral {
+  [CarAccountRepository] as CAR
+  [ChargingRequestRepository] as CRR
+  [ChargingPileRepository] as CPR
+  [BillRepository] as BR
+  [BillingRuleRepository] as BRR
+  [SystemConfigRepository] as SCR
+}
+
+package "Entity 层" as Entity #LightGray {
+  [CarAccount]
+  [ChargingRequest]
+  [ChargingPile]
+  [Bill]
+  [BillingRule]
+  [SystemConfig]
+}
+
+database "H2 Database" as DB #LightPink
+
+FrontEnd --> Controller : REST API
+AC --> AS
+CC --> CRS
+CC --> BS
+CPC --> CPS
+CPC --> SS
+AS --> CAR
+CRS --> CRR
+CRS --> AS
+CRS --> CPS
+CRS --> SS
+CRS --> BS
+CPS --> CPR
+CPS --> BS
+CPS --> SS
+SS --> CRR
+SS --> CPR
+SS --> SCR
+BS --> BR
+BS --> BRR
+CAR --> DB
+CRR --> DB
+CPR --> DB
+BR --> DB
+BRR --> DB
+SCR --> DB
+
+note right of Service
+  Spring Boot 3.5
+  三层架构 (MVC)
+end note
+
+@enduml

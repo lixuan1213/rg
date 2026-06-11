@@ -1,0 +1,34 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title Start_ChargingPile(pile_Id) 交互图
+
+actor "管理员" as Admin
+participant "ChargingPileController" as CPC
+participant "ChargingPileService" as CPS
+participant "SchedulingService" as SS
+database "ChargingPileRepository" as CPR
+database "ChargingRequestRepository" as CRR
+
+Admin -> CPC: POST /api/pile/{pileId}/start\nStart_ChargingPile(pile_Id)
+activate CPC
+CPC -> CPS: startChargingPile(pileId)
+activate CPS
+CPS -> CPR: findById(pileId)
+CPR --> CPS: ChargingPile
+alt workingState != OFF && workingState != FAULT
+    CPS -> CPS: pile.setWorkingState(CHARGING)
+    CPS -> CPR: save(pile)
+    CPS -> SS: dispatchWaitingCars(pile.getMode())
+    activate SS
+    SS -> SS: getOrderedWaitingCars(mode)\nfindAvailablePile(mode)\nassignCarToPile()
+    SS -> CRR: save(requests)
+    deactivate SS
+    CPS --> CPC: ResultResponse.success()
+else 无法启动
+    CPS --> CPC: ResultResponse.fail()
+end
+deactivate CPS
+CPC --> Admin: Return(0/1)
+deactivate CPC
+
+@enduml

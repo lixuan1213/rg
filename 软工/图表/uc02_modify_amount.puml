@@ -1,0 +1,28 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title Modify_Amount(car_Id, Amount) 交互图
+
+actor "车主" as User
+participant "ChargingController" as CC
+participant "ChargingRequestService" as CRS
+database "ChargingRequestRepository" as CRR
+
+User -> CC: PUT /api/charging/amount\nModify_Amount(car_Id, Amount)
+activate CC
+CC -> CRS: modifyAmount(request)
+activate CRS
+CRS -> CRR: findFirstByCarIdAndActiveTrue(car_Id)
+CRR --> CRS: ChargingRequest
+alt carState != CHARGING
+    CRS -> CRS: req.setRequestAmount(Amount)
+    CRS -> CRR: save(req)
+    CRR --> CRS: OK
+    CRS --> CC: ResultResponse.success()
+else carState == CHARGING
+    CRS --> CC: ResultResponse.fail()
+end
+deactivate CRS
+CC --> User: Return(0/1)
+deactivate CC
+
+@enduml

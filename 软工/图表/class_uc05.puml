@@ -1,0 +1,78 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title UC_05 运行充电桩——静态结构类图
+
+class ChargingPileController {
+  - chargingPileService: ChargingPileService
+  + powerOn(pileId): ApiResponse
+  + powerOff(pileId): ApiResponse
+  + startChargingPile(pileId): ApiResponse
+  + setParameters(request): ApiResponse
+}
+
+class ChargingPileService {
+  - chargingPileRepository: CPR
+  - billingService: BillingService
+  - schedulingService: SchedulingService
+  + powerOn(pileId): ResultResponse
+  + powerOff(pileId): ResultResponse
+  + startChargingPile(pileId): ResultResponse
+  + setParameters(request): ResultResponse
+  + getPile(pileId): ChargingPile
+  + savePile(pile): void
+}
+
+class ChargingPileRepository <<Repository>> {
+  + findById(pileId): Optional<ChargingPile>
+  + findByMode(mode): List<ChargingPile>
+  + save(pile): ChargingPile
+}
+
+class ChargingPile {
+  - pileId: String
+  - mode: ChargingMode
+  - workingState: PileWorkingState
+  - totalChargeNum: Integer
+  - totalChargeTime: Long
+  - totalCapacity: Double
+  - parkingSpots: Integer
+  - occupiedSpots: Integer
+  - chargingPower: Double
+}
+
+class BillingService {
+  + updateBillingRules(rules): void
+}
+
+class BillingRuleRepository <<Repository>> {
+  + deleteAll(): void
+  + saveAll(rules): void
+}
+
+class BillingRule {
+  - timePeriod: TimePeriod
+  - startHour: int
+  - endHour: int
+  - electricityPrice: double
+  - serviceFeeRate: double
+}
+
+class SchedulingService {
+  + updateSchedulingStrategy(strategy): void
+  + dispatchWaitingCars(mode): void
+}
+
+class SystemConfigRepository <<Repository>> {
+  + save(config): SystemConfig
+}
+
+ChargingPileController --> ChargingPileService : 依赖
+ChargingPileService --> ChargingPileRepository : 依赖
+ChargingPileService --> BillingService : 依赖
+ChargingPileService --> SchedulingService : 依赖
+ChargingPileRepository ..> ChargingPile : 依赖
+BillingService --> BillingRuleRepository : 依赖
+BillingRuleRepository ..> BillingRule : 依赖
+SchedulingService --> SystemConfigRepository : 依赖
+
+@enduml

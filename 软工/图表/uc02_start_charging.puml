@@ -1,0 +1,36 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title Start_Charging(car_id, ChargePileNum) 交互图
+
+actor "车主" as User
+participant "ChargingController" as CC
+participant "ChargingRequestService" as CRS
+participant "ChargingPileService" as CPS
+database "ChargingRequestRepository" as CRR
+database "ChargingPileRepository" as CPR
+
+User -> CC: POST /api/charging/start\nStart_Charging(car_id, ChargePileNum)
+activate CC
+CC -> CRS: startCharging(request)
+activate CRS
+CRS -> CRR: findFirstByCarIdAndActiveTrue(carId)
+CRR --> CRS: ChargingRequest
+CRS -> CPS: getPile(chargePileNum)
+activate CPS
+CPS -> CPR: findById(pileId)
+CPR --> CPS: ChargingPile
+deactivate CPS
+alt carState==QUEUED && pileId matches && pile state is not OFF/FAULT
+    CRS -> CRS: req.setCarState(CHARGING)\nreq.setStartTime(now)
+    CRS -> CPS: pile.setWorkingState(CHARGING)
+    CRS -> CRR: save(req)
+    CRS -> CPS: savePile(pile)
+    CRS --> CC: ResultResponse.success()
+else 条件不满足
+    CRS --> CC: ResultResponse.fail()
+end
+deactivate CRS
+CC --> User: Return(0/1)
+deactivate CC
+
+@enduml

@@ -1,0 +1,65 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+skinparam classAttributeIconSize 0
+title 充电桩调度计费系统——系统级静态结构总图
+
+package "Controller 层" {
+  class AccountController
+  class ChargingController
+  class ChargingPileController
+}
+
+package "Service 层" {
+  class AccountService
+  class ChargingRequestService
+  class ChargingPileService
+  class SchedulingService
+  class BillingService
+}
+
+package "Repository 层" <<Repository>> {
+  class CarAccountRepository
+  class ChargingRequestRepository
+  class ChargingPileRepository
+  class BillRepository
+  class BillingRuleRepository
+  class SystemConfigRepository
+}
+
+package "Entity 层" <<Entity>> {
+  class CarAccount
+  class ChargingRequest
+  class ChargingPile
+  class Bill
+  class BillingRule
+  class SystemConfig
+}
+
+AccountController --> AccountService : 依赖
+ChargingController --> ChargingRequestService : 依赖
+ChargingPileController --> ChargingPileService : 依赖
+
+ChargingRequestService --> AccountService : 依赖
+ChargingRequestService --> ChargingPileService : 依赖
+ChargingRequestService --> SchedulingService : 依赖
+ChargingRequestService --> BillingService : 依赖
+ChargingPileService --> BillingService : 依赖
+ChargingPileService --> SchedulingService : 依赖
+
+AccountService --> CarAccountRepository : 依赖
+ChargingRequestService --> ChargingRequestRepository : 依赖
+ChargingPileService --> ChargingPileRepository : 依赖
+BillingService --> BillRepository : 依赖
+BillingService --> BillingRuleRepository : 依赖
+SchedulingService --> ChargingRequestRepository : 依赖
+SchedulingService --> ChargingPileRepository : 依赖
+SchedulingService --> SystemConfigRepository : 依赖
+
+CarAccountRepository ..> CarAccount : 依赖
+ChargingRequestRepository ..> ChargingRequest : 依赖
+ChargingPileRepository ..> ChargingPile : 依赖
+BillRepository ..> Bill : 依赖
+BillingRuleRepository ..> BillingRule : 依赖
+SystemConfigRepository ..> SystemConfig : 依赖
+
+@enduml

@@ -1,0 +1,26 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title Query_PileState(pile_Id) 交互图
+
+actor "管理员/用户" as Actor
+participant "ChargingPileController" as CPC
+participant "ChargingPileService" as CPS
+database "ChargingPileRepository" as CPR
+database "H2 DB" as DB
+
+Actor -> CPC: GET /api/pile/{pileId}/state\nQuery_PileState(pile_Id)
+activate CPC
+CPC -> CPS: queryPileState(pileId)
+activate CPS
+CPS -> CPR: findById(pileId)
+activate CPR
+CPR -> DB: SELECT * FROM charging_pile WHERE pile_id=?
+DB --> CPR: ChargingPile
+deactivate CPR
+CPS -> CPS: new PileStateResponse(\npileId, workingState, totalChargeNum,\ntotalChargeTime, totalCapacity)
+CPS --> CPC: PileStateResponse
+deactivate CPS
+CPC --> Actor: Return(workingState, TotalChargeNum,\nTotalChargeTime, TotalCapacity)
+deactivate CPC
+
+@enduml

@@ -1,0 +1,25 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title UC_04 查看详单——静态结构类图
+
+class ChargingController {
+  + requestDetailedList(billId): ApiResponse
+}
+
+class ChargingRequestService {
+  + requestDetailedList(billId): BillDetailResponse
+}
+
+class BillingService {
+  + getBill(billId): Bill
+}
+
+class BillRepository <<Repository>> {
+  + findById(billId): Optional<Bill>
+}
+
+ChargingController --> ChargingRequestService : 依赖
+ChargingRequestService --> BillingService : 依赖
+BillingService --> BillRepository : 依赖
+
+@enduml

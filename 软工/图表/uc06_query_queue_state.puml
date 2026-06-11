@@ -1,0 +1,28 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title Query_QueueState(queuelist) 交互图
+
+actor "管理员/用户" as Actor
+participant "ChargingController" as CC
+participant "ChargingRequestService" as CRS
+database "ChargingRequestRepository" as CRR
+database "H2 DB" as DB
+
+Actor -> CC: GET /api/charging/queue?mode=\nQuery_QueueState(queuelist)
+activate CC
+CC -> CRS: queryQueueState(mode)
+activate CRS
+CRS -> CRR: findByRequestModeAndCarStateAndActiveTrueOrderByRequestTimeAsc(mode, QUEUED)
+activate CRR
+CRR -> DB: SELECT * FROM charging_request\nWHERE request_mode=? AND car_state='QUEUED' AND active=true\nORDER BY request_time ASC
+DB --> CRR: List<ChargingRequest>
+deactivate CRR
+loop for each request
+    CRS -> CRS: waitTime = between(requestTime, now)\nnew QueueStateResponse(carId, carCapacity, requestAmount, waitTime)
+end
+CRS --> CC: List<QueueStateResponse>
+deactivate CRS
+CC --> Actor: Return(car_Id, car_Capacity,\nRequest_Amount, waitTime)
+deactivate CC
+
+@enduml

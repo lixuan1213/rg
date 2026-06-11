@@ -1,0 +1,31 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title Query_Charging_State(car_id) 交互图
+
+actor "车主" as User
+participant "ChargingController" as CC
+participant "ChargingRequestService" as CRS
+participant "ChargingPileService" as CPS
+database "ChargingRequestRepository" as CRR
+database "ChargingPileRepository" as CPR
+
+User -> CC: GET /api/charging/state/{carId}\nQuery_Charging_State(car_id)
+activate CC
+CC -> CRS: queryChargingState(carId)
+activate CRS
+CRS -> CRR: findFirstByCarIdAndActiveTrue(carId)
+CRR --> CRS: ChargingRequest
+alt carState == CHARGING
+    CRS -> CPS: getPile(pileId)
+    activate CPS
+    CPS -> CPR: findById(pileId)
+    CPR --> CPS: ChargingPile
+    deactivate CPS
+    CRS -> CRS: remaining = (requestAmount - chargedAmount) / power * 60
+end
+CRS --> CC: ChargingStateResponse(carId, pileId, mode, requestAmount, chargedAmount, carState, startTime, remaining)
+deactivate CRS
+CC --> User: Return(详单信息)
+deactivate CC
+
+@enduml

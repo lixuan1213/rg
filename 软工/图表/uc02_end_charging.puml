@@ -1,0 +1,46 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title End_Charging(car_id, ChargingPileNum) 交互图
+
+actor "车主" as User
+participant "ChargingController" as CC
+participant "ChargingRequestService" as CRS
+participant "ChargingPileService" as CPS
+participant "BillingService" as BS
+participant "SchedulingService" as SS
+database "ChargingRequestRepository" as CRR
+database "ChargingPileRepository" as CPR
+database "BillRepository" as BR
+
+User -> CC: POST /api/charging/end\nEnd_Charging(car_id, ChargingPileNum)
+activate CC
+CC -> CRS: endCharging(request)
+activate CRS
+CRS -> CRR: findFirstByCarIdAndActiveTrue(carId)
+CRR --> CRS: ChargingRequest
+alt carState==CHARGING && pileId matches
+    CRS -> CPS: getPile(pileId)
+    CPS --> CRS: ChargingPile
+    CRS -> CRS: endTime=now, minutes=between(start,end)\nchargedAmount=power*minutes/60
+    CRS -> CRS: req.setCarState(COMPLETED)\nreq.setActive(false)
+    CRS -> CPS: pile.totalChargeNum++\npile.totalChargeTime+=minutes\npile.totalCapacity+=chargedAmount\npile.occupiedSpots--
+    CRS -> BS: createBill(request, pile)
+    activate BS
+    BS -> BS: findRuleForTime(endTime)\n计算 chargeFee + serviceFee
+    BS -> BR: save(Bill)
+    deactivate BS
+    CRS -> CRR: save(req)
+    CRS -> CPS: savePile(pile)
+    CRS -> SS: dispatchWaitingCars(mode)
+    activate SS
+    SS -> CRR: save (重新分配)
+    deactivate SS
+    CRS --> CC: ResultResponse.success()
+else 条件不满足
+    CRS --> CC: ResultResponse.fail()
+end
+deactivate CRS
+CC --> User: Return(0/1)
+deactivate CC
+
+@enduml

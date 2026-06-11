@@ -1,0 +1,56 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title 充电桩故障调度——时间顺序调度
+
+actor "系统" as System
+participant "SchedulingService" as SS
+database "ChargingRequestRepository" as CRR
+database "ChargingPileRepository" as CPR
+database "SystemConfigRepository" as SCR
+
+note over System: 充电桩故障触发 handlePileFault(pileId)
+
+System -> SS: handlePileFault(pileId)
+activate SS
+SS -> CPR: findById(pileId)
+CPR --> SS: ChargingPile (故障桩)
+SS -> SS: pile.setWorkingState(FAULT)
+
+SS -> CRR: findByPileIdAndCarStateAndActiveTrue(pileId, CHARGING)
+CRR --> SS: List<ChargingRequest> (被中断的充电车辆)
+
+loop for each interrupted car
+    SS -> SS: request.setCarState(QUEUED)\nrequest.setPileId(null)
+    SS -> SS: pile.occupiedSpots--
+end
+SS -> CPR: save(pile)
+
+SS -> SCR: findAll() -> getConfig
+SCR --> SS: SystemConfig (strategy=TIME_ORDER)
+
+SS -> CRR: findByRequestModeAndCarStateAndActiveTrue\nOrderByRequestTimeAsc(mode, WAITING)
+CRR --> SS: 等待车辆 (按申请时间升序)
+
+loop for each waiting car (先来先分配)
+    SS -> CPR: findByMode(mode) 找空闲桩\nfilter: (IDLE || CHARGING)\n&& occupiedSpots < parkingSpots\nmin(occupiedSpots)
+    CPR --> SS: 最优空闲桩
+    alt 有空闲桩
+        SS -> SS: assignCarToPile(car, pile)\ncarState=QUEUED, 分配排队号
+        SS -> CRR: save(car)
+        SS -> CPR: save(pile)
+    else 无空闲桩
+        SS -> SS: break
+    end
+end
+
+note over SS: 被中断车辆按申请时间重新分配
+SS -> SS: redistributeFaultRecovery(interrupted, mode)\n按requestTime升序排序
+loop for each interrupted (先申请先分配)
+    SS -> SS: car.setCarState(WAITING)
+    SS -> CRR: save(car)
+    SS -> SS: dispatchWaitingCars(mode)
+end
+
+deactivate SS
+
+@enduml

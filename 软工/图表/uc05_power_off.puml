@@ -1,0 +1,31 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title powerOff(pile_Id) 交互图
+
+actor "管理员" as Admin
+participant "ChargingPileController" as CPC
+participant "ChargingPileService" as CPS
+database "ChargingPileRepository" as CPR
+database "H2 DB" as DB
+
+Admin -> CPC: POST /api/pile/{pileId}/power-off\npowerOff(pile_Id)
+activate CPC
+CPC -> CPS: powerOff(pileId)
+activate CPS
+CPS -> CPR: findById(pileId)
+activate CPR
+CPR -> DB: SELECT * FROM charging_pile WHERE pile_id=?
+DB --> CPR: ChargingPile
+deactivate CPR
+CPS -> CPS: pile.setWorkingState(OFF)
+CPS -> CPR: save(pile)
+activate CPR
+CPR -> DB: UPDATE charging_pile SET working_state='OFF'
+DB --> CPR: OK
+deactivate CPR
+CPS --> CPC: ResultResponse.success()
+deactivate CPS
+CPC --> Admin: Return(0/1)
+deactivate CPC
+
+@enduml

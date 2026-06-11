@@ -1,0 +1,35 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title set_pwd(******) 交互图
+
+actor "车主" as User
+participant "AccountController" as AC
+participant "AccountService" as AS
+database "CarAccountRepository" as CAR
+database "H2 DB" as DB
+
+User -> AC: POST /api/account/set-pwd\nset_pwd(password)
+activate AC
+AC -> AS: setPassword(request)
+activate AS
+AS -> CAR: findById(car_Id)
+activate CAR
+CAR -> DB: SELECT * FROM car_account WHERE car_id=?
+DB --> CAR: CarAccount
+deactivate CAR
+alt 账号存在
+    AS -> AS: account.setPassword(password)\naccount.setRegistered(true)
+    AS -> CAR: save(account)
+    activate CAR
+    CAR -> DB: UPDATE car_account SET password=?, registered=true
+    DB --> CAR: OK
+    deactivate CAR
+    AS --> AC: true
+else 账号不存在
+    AS --> AC: false
+end
+deactivate AS
+AC --> User: Return(0/1)
+deactivate AC
+
+@enduml

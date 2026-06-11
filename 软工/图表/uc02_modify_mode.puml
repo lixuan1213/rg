@@ -1,0 +1,34 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title Modify_Mode(car_Id, Mode) 交互图
+
+actor "车主" as User
+participant "ChargingController" as CC
+participant "ChargingRequestService" as CRS
+participant "SchedulingService" as SS
+database "ChargingRequestRepository" as CRR
+
+User -> CC: PUT /api/charging/mode\nModify_Mode(car_Id, Mode)
+activate CC
+CC -> CRS: modifyMode(request)
+activate CRS
+CRS -> CRR: findFirstByCarIdAndActiveTrue(car_Id)
+CRR --> CRS: ChargingRequest
+alt carState != CHARGING
+    CRS -> CRS: 记录 oldMode\nreq.setRequestMode(newMode)\nreq.setCarState(WAITING)\nreq.setPileId(null)
+    CRS -> CRR: save(req)
+    CRS -> CRS: refreshQueueNumbers(oldMode)
+    CRS -> SS: dispatchWaitingCars(newMode)
+    activate SS
+    SS -> CRR: save requests (更新队列)
+    deactivate SS
+    CRS -> CRS: refreshQueueNumbers(newMode)
+    CRS --> CC: ResultResponse.success()
+else carState == CHARGING
+    CRS --> CC: ResultResponse.fail()
+end
+deactivate CRS
+CC --> User: Return(0/1)
+deactivate CC
+
+@enduml

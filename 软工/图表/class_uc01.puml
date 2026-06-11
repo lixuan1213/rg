@@ -1,0 +1,37 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title UC_01 注册——静态结构类图
+
+class AccountController {
+  - accountService: AccountService
+  + createNewAccount(request): ApiResponse
+  + setPassword(request): ApiResponse
+}
+
+class AccountService {
+  - carAccountRepository: CarAccountRepository
+  + createNewAccount(request): boolean
+  + setPassword(request): boolean
+  + getAccount(carId): CarAccount
+}
+
+class CarAccountRepository <<Repository>> {
+  + findById(carId): Optional<CarAccount>
+  + existsById(carId): boolean
+  + save(account): CarAccount
+}
+
+class CarAccount {
+  - carId: String
+  - userName: String
+  - carCapacity: Double
+  - password: String
+  - registered: boolean
+  + getters/setters
+}
+
+AccountController --> AccountService : 依赖
+AccountService --> CarAccountRepository : 依赖
+CarAccountRepository ..> CarAccount : 依赖
+
+@enduml

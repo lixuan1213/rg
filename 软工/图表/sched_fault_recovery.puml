@@ -1,0 +1,52 @@
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
+title 充电桩故障恢复交互
+
+actor "管理员/系统" as Actor
+participant "ChargingPileController" as CPC
+participant "ChargingPileService" as CPS
+participant "SchedulingService" as SS
+database "ChargingPileRepository" as CPR
+database "ChargingRequestRepository" as CRR
+
+Actor -> CPC: POST /api/pile/{pileId}/recover\nrecoverPileFault(pileId)
+activate CPC
+CPC -> CPS: recoverFault(pileId)
+activate CPS
+CPS -> SS: recoverPileFault(pileId)
+activate SS
+SS -> CPR: findById(pileId)
+CPR --> SS: ChargingPile
+
+alt workingState == FAULT
+    SS -> SS: pile.setWorkingState(IDLE)
+    SS -> CPR: save(pile)
+
+    SS -> SS: dispatchWaitingCars(pile.getMode())
+
+    SS -> CRR: 获取等待队列(按策略排序)
+    CRR --> SS: waitingCars
+
+    loop for each waiting car
+        SS -> CPR: findAvailablePile(mode)\n过滤: IDLE/CHARGING && 有空位
+        CPR --> SS: availablePile
+        alt 有空闲桩
+            SS -> SS: assignCarToPile(car, pile)
+            SS -> CRR: save(car)
+            SS -> CPR: save(pile)
+        else 无空闲桩
+            SS -> SS: break
+        end
+    end
+
+    SS --> CPS: 恢复完成，等待队列重新分配
+else workingState != FAULT
+    SS --> CPS: 无需恢复（桩不在故障状态）
+end
+deactivate SS
+CPS --> CPC: ResultResponse.success()
+deactivate CPS
+CPC --> Actor: Return(0/1)
+deactivate CPC
+
+@enduml
