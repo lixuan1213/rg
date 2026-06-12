@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 
 export default function BillQueryPage() {
   const [bills, setBills] = useState<BillResponse[]>([]);
+  const [queried, setQueried] = useState(false);
   const [detail, setDetail] = useState<BillDetailResponse | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -15,6 +16,7 @@ export default function BillQueryPage() {
     try {
       const res = await requestBill(values.carId, dayjs().format('YYYY-MM-DD'));
       setBills(res.data.data);
+      setQueried(true);
     } catch { /* handled */ }
     setLoading(false);
   };
@@ -75,11 +77,13 @@ export default function BillQueryPage() {
         </Col>
       </Row>
 
-      {bills.length > 0 && (
+      {bills.length > 0 ? (
         <Card title={`账单列表（${dayjs().format('YYYY-MM-DD')}）`} style={{ marginTop: 16 }}>
           <Table dataSource={bills} rowKey="billId" columns={columns} />
         </Card>
-      )}
+      ) : queried ? (
+        <Card style={{ marginTop: 16 }}><Tag>该车辆当天暂无账单</Tag></Card>
+      ) : null}
 
       <Modal title={`账单详情 #${detail?.billId ?? ''}`} open={detailOpen} onCancel={() => setDetailOpen(false)} footer={null} width={600}>
         {detail && (

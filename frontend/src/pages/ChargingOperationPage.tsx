@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card, Form, Input, InputNumber, Select, Button, Descriptions, Tag, Space, Divider, message, Spin, Alert, Modal,
 } from 'antd';
@@ -11,6 +11,7 @@ import {
   modifyAmount,
   modifyMode,
 } from '../api/chargingApi';
+import { useAuth } from '../components/AuthContext';
 
 const carStateLabel: Record<CarState, string> = {
   WAITING: '等待中', QUEUED: '已排队', CHARGING: '充电中', PENDING_UNPLUG: '待拔枪', COMPLETED: '已完成', CANCELLED: '已取消',
@@ -21,6 +22,7 @@ const carStateColor: Record<CarState, string> = {
 const modeLabel: Record<ChargingMode, string> = { FAST: '快充', SLOW: '慢充' };
 
 export default function ChargingOperationPage() {
+  const { userId } = useAuth();
   const [state, setState] = useState<ChargingStateResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeCarId, setActiveCarId] = useState<string | null>(null);
@@ -30,6 +32,15 @@ export default function ChargingOperationPage() {
   const [amountForm] = Form.useForm();
   const [modeModalOpen, setModeModalOpen] = useState(false);
   const [modeForm] = Form.useForm();
+
+  const myCarId = userId;
+
+  useEffect(() => {
+    if (myCarId) {
+      submitForm.setFieldsValue({ carId: myCarId });
+      queryForm.setFieldsValue({ carId: myCarId });
+    }
+  }, [myCarId, submitForm, queryForm]);
 
   const fetchState = async (carId: string) => {
     try {
@@ -121,7 +132,7 @@ export default function ChargingOperationPage() {
       <Card title="提交充电请求">
         <Form layout="inline" form={submitForm} onFinish={handleSubmitRequest}>
           <Form.Item name="carId" label="车辆ID" rules={[{ required: true }]}>
-            <Input placeholder="如 CAR001" style={{ width: 120 }} />
+            <Input placeholder="如 CAR001" style={{ width: 120 }} readOnly />
           </Form.Item>
           <Form.Item name="requestAmount" label="请求电量(kWh)" rules={[{ required: true, type: 'number', min: 0.1 }]}>
             <InputNumber step={0.1} min={0.1} style={{ width: 120 }} />
@@ -140,7 +151,7 @@ export default function ChargingOperationPage() {
       <Card title="查询或选择车辆操作">
         <Form layout="inline" form={queryForm} onFinish={handleQuery}>
           <Form.Item name="carId" label="车辆ID" rules={[{ required: true }]}>
-            <Input placeholder="输入 carId 查询" style={{ width: 140 }} />
+            <Input placeholder="输入 carId 查询" style={{ width: 140 }} readOnly />
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit">查询</Button>

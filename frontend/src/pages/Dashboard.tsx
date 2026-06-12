@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Card, Col, Row, Statistic, Table, Tag, Spin, Input, Button, Descriptions, Divider, Space } from 'antd';
+import { Card, Col, Row, Statistic, Table, Tag, Spin } from 'antd';
 import {
   ThunderboltOutlined, ClockCircleOutlined, DashboardOutlined, CarOutlined,
 } from '@ant-design/icons';
 import { queryAllPileStates } from '../api/pileApi';
 import { queryQueueState, queryChargingState, queryCarState } from '../api/chargingApi';
 import type {
-  PileStateResponse, QueueStateResponse, PileWorkingState, CarState, ChargingStateResponse,
+  PileStateResponse, QueueStateResponse, PileWorkingState,
 } from '../api/types';
 
 const stateColorMap: Record<PileWorkingState, string> = {
@@ -14,12 +14,6 @@ const stateColorMap: Record<PileWorkingState, string> = {
 };
 const stateLabelMap: Record<PileWorkingState, string> = {
   OFF: '关机', IDLE: '空闲', CHARGING: '充电中', WAITING_UNPLUG: '待拔枪', FAULT: '故障',
-};
-const carStateLabel: Record<CarState, string> = {
-  WAITING: '等待中', QUEUED: '已排队', CHARGING: '充电中', PENDING_UNPLUG: '待拔枪', COMPLETED: '已完成', CANCELLED: '已取消',
-};
-const carStateColor: Record<CarState, string> = {
-  WAITING: 'default', QUEUED: 'warning', CHARGING: 'processing', PENDING_UNPLUG: 'orange', COMPLETED: 'success', CANCELLED: 'error',
 };
 
 const PILE_POWER: Record<string, number> = { FAST: 60, SLOW: 7 };
@@ -34,12 +28,6 @@ export default function Dashboard() {
   const [fastDetail, setFastDetail] = useState<QueueDetail[]>([]);
   const [slowDetail, setSlowDetail] = useState<QueueDetail[]>([]);
   const [loading, setLoading] = useState(false);
-
-  // query forms
-  const [carIdInput, setCarIdInput] = useState('');
-  const [carStateResult, setCarStateResult] = useState<{ carState: CarState; queueNum: number | null; carNumberBeforePosition: number; requestTime: string } | null>(null);
-  const [stateCarId, setStateCarId] = useState('');
-  const [chargeStateResult, setChargeStateResult] = useState<ChargingStateResponse | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -78,15 +66,6 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => { fetchData(); const t = setInterval(fetchData, 10000); return () => clearInterval(t); }, [fetchData]);
-
-  const handleQueryCarState = async () => {
-    if (!carIdInput.trim()) return;
-    try { setCarStateResult((await queryCarState(carIdInput.trim())).data.data); } catch { setCarStateResult(null); }
-  };
-  const handleQueryChargeState = async () => {
-    if (!stateCarId.trim()) return;
-    try { setChargeStateResult((await queryChargingState(stateCarId.trim())).data.data); } catch { setChargeStateResult(null); }
-  };
 
   const allQueueDetails = [...fastDetail, ...slowDetail];
   const pileQueueMap = new Map<string, QueueDetail[]>();
@@ -147,43 +126,6 @@ export default function Dashboard() {
           </Card>
         </Col>
       </Row>
-
-      <Divider />
-      <Card title="状态查询">
-        <Row gutter={[16, 16]}>
-          <Col xs={24} md={12}>
-            <Card size="small" title="查询排队状态">
-              <Space>
-                <Input placeholder="车辆ID" value={carIdInput} onChange={e => setCarIdInput(e.target.value)} style={{ width: 120 }} />
-                <Button onClick={handleQueryCarState}>查询</Button>
-              </Space>
-              {carStateResult && (
-                <Descriptions style={{ marginTop: 8 }} column={1} size="small" bordered>
-                  <Descriptions.Item label="状态"><Tag color={carStateColor[carStateResult.carState]}>{carStateLabel[carStateResult.carState]}</Tag></Descriptions.Item>
-                  <Descriptions.Item label="排队号">{carStateResult.queueNum ?? '-'}</Descriptions.Item>
-                  <Descriptions.Item label="前方">{carStateResult.carNumberBeforePosition}</Descriptions.Item>
-                </Descriptions>
-              )}
-            </Card>
-          </Col>
-          <Col xs={24} md={12}>
-            <Card size="small" title="查询充电详细状态">
-              <Space>
-                <Input placeholder="车辆ID" value={stateCarId} onChange={e => setStateCarId(e.target.value)} style={{ width: 120 }} />
-                <Button onClick={handleQueryChargeState}>查询</Button>
-              </Space>
-              {chargeStateResult && (
-                <Descriptions style={{ marginTop: 8 }} column={1} size="small" bordered>
-                  <Descriptions.Item label="状态"><Tag color={carStateColor[chargeStateResult.carState]}>{carStateLabel[chargeStateResult.carState]}</Tag></Descriptions.Item>
-                  <Descriptions.Item label="桩">{chargeStateResult.chargePileNum ?? '-'}</Descriptions.Item>
-                  <Descriptions.Item label="请求/已充(kWh)">{chargeStateResult.requestAmount} / {chargeStateResult.chargedAmount.toFixed(1)}</Descriptions.Item>
-                  <Descriptions.Item label="剩余(分)">{chargeStateResult.estimatedRemainingMinutes ?? '-'}</Descriptions.Item>
-                </Descriptions>
-              )}
-            </Card>
-          </Col>
-        </Row>
-      </Card>
     </Spin>
   );
 }

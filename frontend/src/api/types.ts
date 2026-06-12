@@ -140,6 +140,24 @@ export interface CreateAccountRequest {
   carCapacity: number;
 }
 
+export interface LoginRequest {
+  userName: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  carId: string;
+  userName: string;
+  carCapacity: number;
+}
+
+export interface AccountSummaryResponse {
+  carId: string;
+  userName: string;
+  carCapacity: number;
+  registered: boolean;
+}
+
 export interface SetPasswordRequest {
   carId: string;
   password: string;
